@@ -1,2 +1,3 @@
-# triplestore
-fast minimalist RDF triple store
+# Triple Store
+
+Fast, minimalist RDF triple store
