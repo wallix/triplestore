@@ -18,6 +18,15 @@ type Literal interface {
 	Value() string
 }
 
+type XsdType uint8
+
+var (
+	XsdString   = XsdType(0)
+	XsdBoolean  = XsdType(1)
+	XsdInteger  = XsdType(2)
+	XsdDateTime = XsdType(3)
+)
+
 type subject string
 type predicate string
 

@@ -1,6 +1,9 @@
 package triplestore
 
-import "fmt"
+import (
+	"fmt"
+	"time"
+)
 
 type tripleBuilder struct {
 	sub, pred string
@@ -57,6 +60,21 @@ func (b *tripleBuilder) StringLiteral(s string) *triple {
 	t.obj = object{
 		isLit: true,
 		lit:   literal{typ: XsdString, val: s},
+	}
+
+	return t
+}
+
+func (b *tripleBuilder) DateTimeLiteral(tm time.Time) *triple {
+	t := &triple{sub: subject(b.sub), pred: predicate(b.pred)}
+
+	text, err := tm.MarshalText()
+	if err != nil {
+		panic(fmt.Errorf("date time literal: %s", err))
+	}
+	t.obj = object{
+		isLit: true,
+		lit:   literal{typ: XsdDateTime, val: string(text)},
 	}
 
 	return t

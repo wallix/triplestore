@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"math"
 	"testing"
+	"time"
 )
 
 func TestEncodeAndDecodeAllTripleTypes(t *testing.T) {
@@ -22,6 +23,8 @@ func TestEncodeAndDecodeAllTripleTypes(t *testing.T) {
 
 		{SubjPred("one", "two").BooleanLiteral(true)},
 		{SubjPred("one", "two").BooleanLiteral(false)},
+
+		{SubjPred("one", "two").DateTimeLiteral(time.Now())},
 	}
 
 	for _, tcase := range tcases {
