@@ -18,7 +18,7 @@ func NewEncoder(w io.Writer) *Encoder {
 
 func (enc *Encoder) Encode(tris ...Triple) error {
 	for _, t := range tris {
-		b, err := marshalBinary(t)
+		b, err := encodeTriple(t)
 		if err != nil {
 			return err
 		}
@@ -31,7 +31,7 @@ func (enc *Encoder) Encode(tris ...Triple) error {
 	return nil
 }
 
-func marshalBinary(t Triple) ([]byte, error) {
+func encodeTriple(t Triple) ([]byte, error) {
 	sub, pred := t.Subject(), t.Predicate()
 
 	var buff bytes.Buffer
@@ -44,20 +44,14 @@ func marshalBinary(t Triple) ([]byte, error) {
 	obj := t.Object()
 	if lit, isLit := obj.Literal(); isLit {
 		binary.Write(&buff, binary.BigEndian, uint8(1))
-		switch lit.Type() {
-		case XsdString:
-			binary.Write(&buff, binary.BigEndian, uint8(0))
-		case XsdInteger:
-			binary.Write(&buff, binary.BigEndian, uint8(1))
-		case XsdBoolean:
-			binary.Write(&buff, binary.BigEndian, uint8(2))
-		}
+		binary.Write(&buff, binary.BigEndian, lit.Type())
 		litVal := lit.Value()
 		binary.Write(&buff, binary.BigEndian, uint8(len(litVal)))
 		buff.WriteString(litVal)
 	} else {
 		binary.Write(&buff, binary.BigEndian, uint8(0))
 		resID, _ := obj.ResourceID()
+		binary.Write(&buff, binary.BigEndian, uint8(len(resID)))
 		buff.WriteString(resID)
 	}
 
@@ -120,14 +114,7 @@ func (dec *Decoder) decodeTriple() (bool, error) {
 		if err := binary.Read(dec.r, binary.BigEndian, &litType); err != nil {
 			return false, fmt.Errorf("literate type: %s", err)
 		}
-		switch int(litType) {
-		case 0:
-			decodedLiteral.typ = XsdString
-		case 1:
-			decodedLiteral.typ = XsdInteger
-		case 2:
-			decodedLiteral.typ = XsdBoolean
-		}
+		decodedLiteral.typ = XsdType(litType)
 
 		val, err := dec.readLengthFirstWord()
 		if err != nil {

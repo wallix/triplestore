@@ -14,7 +14,7 @@ type Object interface {
 }
 
 type Literal interface {
-	Type() string
+	Type() XsdType
 	Value() string
 }
 
@@ -88,19 +88,14 @@ func (o object) Equal(other Object) bool {
 }
 
 type literal struct {
-	typ, val string
+	typ XsdType
+	val string
 }
 
-func (l literal) Type() string {
+func (l literal) Type() XsdType {
 	return l.typ
 }
 
 func (l literal) Value() string {
 	return l.val
 }
-
-const (
-	XsdString  = "xsd:string"
-	XsdBoolean = "xsd:boolean"
-	XsdInteger = "xsd:integer"
-)
