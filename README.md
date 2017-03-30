@@ -1,3 +1,6 @@
+[![Build Status](https://api.travis-ci.org/wallix/triplestore.svg?branch=master)](https://travis-ci.org/wallix/triplestore)
+[![Go Report Card](https://goreportcard.com/badge/github.com/wallix/triplestore)](https://goreportcard.com/report/github.com/wallix/triplestore)
+
 # Triple Store
 
 Triple Store is a library to manipulate RDF triples in a fast and fluent fashion.
@@ -5,6 +8,14 @@ Triple Store is a library to manipulate RDF triples in a fast and fluent fashion
 RDF triples allow to represent any data and its relations to other data. It is a very versatile concept and is used in [Linked Data](https://en.wikipedia.org/wiki/Linked_data), graph databases and representation, simple directed graph, etc....
 
 Here the RDF triples implementation follows along the [W3C RDF concepts](https://www.w3.org/TR/rdf11-concepts/). (**Note that blank nodes and reification are not implemented**.). More digestible info on [RDF Wikipedia](https://en.wikipedia.org/wiki/Resource_Description_Framework)
+
+## Roadmap
+
+- Generic map and filtering on triples
+- High level triples query API
+- RDF graph comparison
+- Simple RDF graph traversal API
+- Codec to [Turtle syntax](https://en.wikipedia.org/wiki/Turtle_(syntax))
 
 ## Triples quickstart
 
@@ -49,19 +60,32 @@ import (
 
 ## Usage
 
-### Build triples
+### Manipulating triples
 
 ```go
 triples = append(triples,
 	Subject("me").Predicate("name").StringLiteral("jsmith"),
  	Subject("me").Predicate("age").IntegerLiteral(26),
- 	Subject("me").Predicate("male").BooleanLiteral(true),
- 	Subject("me").Predicate("born").DateTimeLiteral(time.Now()),
- 	Subject("me").Predicate("mother").Resource("mum#121287"),
+ 	// or simply
+ 	SubjPred("me", "male").BooleanLiteral(true),
+ 	SubjPred("me", "born").DateTimeLiteral(time.Now()),
+ 	SubjPRed("me", "mother").Resource("mum#121287"),
 )
 ```
 
 Although you can build triples the way you want to model any data, they are usually built from known RDF vocabularies & namespace. Ex: [foaf](http://xmlns.com/foaf/spec/), ...
+
+Check if triples are equal:
+
+```go
+	me := Subject("me").Predicate("name").StringLiteral("jsmith")
+ 	you := Subject("me").Predicate("name").StringLiteral("fdupond")
+
+ 	if me.Equal(you) {
+ 	 	...
+ 	}
+)
+```
 
 ### Triple Storage
 
