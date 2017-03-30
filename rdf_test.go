@@ -1,6 +1,9 @@
 package triplestore
 
-import "testing"
+import (
+	"testing"
+	"time"
+)
 
 func TestBuildTriple(t *testing.T) {
 	tri := Subject("subject").Predicate("predicate").StringLiteral("any")
@@ -16,7 +19,6 @@ func TestBuildTriple(t *testing.T) {
 
 func TestParseObject(t *testing.T) {
 	tri := Subject("subject").Predicate("predicate").IntegerLiteral(123)
-
 	num, err := ParseInteger(tri.Object())
 	if err != nil {
 		t.Fatal(err)
@@ -25,8 +27,26 @@ func TestParseObject(t *testing.T) {
 		t.Fatalf("got %d, want %d", got, want)
 	}
 
-	tri = Subject("subject").Predicate("predicate").StringLiteral("rdf")
+	tri = Subject("subject").Predicate("predicate").BooleanLiteral(true)
+	b, err := ParseBoolean(tri.Object())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := b, true; got != want {
+		t.Fatalf("got %t, want %t", got, want)
+	}
 
+	now := time.Now()
+	tri = Subject("subject").Predicate("predicate").DateTimeLiteral(now)
+	date, err := ParseDateTime(tri.Object())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := date, now.UTC(); got != want {
+		t.Fatalf("got %s, want %s", got, want)
+	}
+
+	tri = Subject("subject").Predicate("predicate").StringLiteral("rdf")
 	lit, ok := tri.Object().Literal()
 	if got, want := ok, true; got != want {
 		t.Fatalf("got %t, want %t", got, want)

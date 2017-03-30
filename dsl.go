@@ -68,7 +68,7 @@ func (b *tripleBuilder) StringLiteral(s string) *triple {
 func (b *tripleBuilder) DateTimeLiteral(tm time.Time) *triple {
 	t := &triple{sub: subject(b.sub), pred: predicate(b.pred)}
 
-	text, err := tm.MarshalText()
+	text, err := tm.UTC().MarshalText()
 	if err != nil {
 		panic(fmt.Errorf("date time literal: %s", err))
 	}
