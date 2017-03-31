@@ -10,7 +10,7 @@ import (
 func ParseInteger(obj Object) (int, error) {
 	if lit, ok := obj.Literal(); ok {
 		if lit.Type() != XsdInteger {
-			return 0, fmt.Errorf("literal is not an integer but %s", lit.Type())
+			return 0, fmt.Errorf("literal is not an integer but %d", lit.Type())
 		}
 
 		return strconv.Atoi(lit.Value())
@@ -22,7 +22,7 @@ func ParseInteger(obj Object) (int, error) {
 func ParseBoolean(obj Object) (bool, error) {
 	if lit, ok := obj.Literal(); ok {
 		if lit.Type() != XsdBoolean {
-			return false, fmt.Errorf("literal is not an boolean but %s", lit.Type())
+			return false, fmt.Errorf("literal is not an boolean but %d", lit.Type())
 		}
 
 		return strconv.ParseBool(lit.Value())
@@ -35,7 +35,7 @@ func ParseDateTime(obj Object) (time.Time, error) {
 	var t time.Time
 	if lit, ok := obj.Literal(); ok {
 		if lit.Type() != XsdDateTime {
-			return t, fmt.Errorf("literal is not an dateTime but %s", lit.Type())
+			return t, fmt.Errorf("literal is not an dateTime but %d", lit.Type())
 		}
 
 		err := t.UnmarshalText([]byte(lit.Value()))

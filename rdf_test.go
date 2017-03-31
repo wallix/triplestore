@@ -55,7 +55,7 @@ func TestParseObject(t *testing.T) {
 		t.Fatalf("got %s, want %s", got, want)
 	}
 	if got, want := lit.Type(), XsdString; got != want {
-		t.Fatalf("got %s, want %s", got, want)
+		t.Fatalf("got %d, want %d", got, want)
 	}
 
 	_, ok = tri.Object().ResourceID()
