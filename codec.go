@@ -8,15 +8,23 @@ import (
 	"io"
 )
 
-type Encoder struct {
+type Encoder interface {
+	Encode(tris ...Triple) error
+}
+
+type Decoder interface {
+	Decode() ([]Triple, error)
+}
+
+type binaryEncoder struct {
 	w io.Writer
 }
 
-func NewEncoder(w io.Writer) *Encoder {
-	return &Encoder{w}
+func NewBinaryEncoder(w io.Writer) Encoder {
+	return &binaryEncoder{w}
 }
 
-func (enc *Encoder) Encode(tris ...Triple) error {
+func (enc *binaryEncoder) Encode(tris ...Triple) error {
 	for _, t := range tris {
 		b, err := encodeTriple(t)
 		if err != nil {
@@ -58,16 +66,16 @@ func encodeTriple(t Triple) ([]byte, error) {
 	return buff.Bytes(), nil
 }
 
-type Decoder struct {
+type binaryDecoder struct {
 	r       io.Reader
 	triples []Triple
 }
 
-func NewDecoder(r io.Reader) *Decoder {
-	return &Decoder{r: r}
+func NewBinaryDecoder(r io.Reader) Decoder {
+	return &binaryDecoder{r: r}
 }
 
-func (dec *Decoder) Decode() ([]Triple, error) {
+func (dec *binaryDecoder) Decode() ([]Triple, error) {
 	for {
 		done, err := dec.decodeTriple()
 		if done {
@@ -80,7 +88,7 @@ func (dec *Decoder) Decode() ([]Triple, error) {
 	return dec.triples, nil
 }
 
-func (dec *Decoder) decodeTriple() (bool, error) {
+func (dec *binaryDecoder) decodeTriple() (bool, error) {
 	sub, err := dec.readLengthFirstWord()
 	if err == io.EOF {
 		return true, nil
@@ -134,7 +142,7 @@ func (dec *Decoder) decodeTriple() (bool, error) {
 	return true, nil
 }
 
-func (dec *Decoder) readLengthFirstWord() ([]byte, error) {
+func (dec *binaryDecoder) readLengthFirstWord() ([]byte, error) {
 	var len uint8
 	if err := binary.Read(dec.r, binary.BigEndian, &len); err != nil {
 		return nil, err
@@ -146,4 +154,42 @@ func (dec *Decoder) readLengthFirstWord() ([]byte, error) {
 	}
 
 	return word, nil
+}
+
+type ntriplesEncoder struct {
+	w io.Writer
+}
+
+func NewNTriplesEncoder(w io.Writer) Encoder {
+	return &ntriplesEncoder{w}
+}
+
+func (enc *ntriplesEncoder) Encode(tris ...Triple) error {
+	for _, t := range tris {
+		var buff bytes.Buffer
+
+		buff.WriteString(fmt.Sprintf("<%s> <%s> ", t.Subject(), t.Predicate()))
+		if rid, ok := t.Object().ResourceID(); ok {
+			buff.WriteString(fmt.Sprintf("<%s>", rid))
+		}
+		if lit, ok := t.Object().Literal(); ok {
+			var litType string
+			switch lit.Type() {
+			case XsdBoolean:
+				litType = "^^<http://www.w3.org/2001/XMLSchema#boolean>"
+			case XsdDateTime:
+				litType = "^^<http://www.w3.org/2001/XMLSchema#dateTime>"
+			case XsdInteger:
+				litType = "^^<http://www.w3.org/2001/XMLSchema#integer>"
+			}
+			buff.WriteString(fmt.Sprintf("\"%s\"%s", lit.Value(), litType))
+		}
+		buff.WriteString(" .\n")
+
+		if _, err := enc.w.Write(buff.Bytes()); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
