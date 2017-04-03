@@ -101,7 +101,9 @@ Check if triples are equal:
 
 ### Raw storage
 
-In this library, higher level APIs used a raw `Encoder` and `Decoder` to store and exchanges triples. They are encoded & decoded using a simple format in order to persists, flush or send them over the network.
+In this library, higher level APIs used `Encoders` and `Decoders` to store and exchanges triples. Triples can be encoded & decoded using a simple format in order to persists, flush or send them over the network.
+
+For example
 
 ```go
 triples = append(triples,
@@ -110,11 +112,11 @@ triples = append(triples,
  	Subject("me").Predicate("born").DateTimeLiteral(time.Now()),
 )
 
-enc := NewEncoder(myWriter)
+enc := NewBinaryEncoder(myWriter)
 err := enc.Encode(triples)
 ...
 
-dec := NewDecoder(myReader)
+dec := NewBinaryDecoder(myReader)
 triples, err := dec.Decode()
 
 ```
