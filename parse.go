@@ -7,6 +7,18 @@ import (
 	"time"
 )
 
+func ParseString(obj Object) (string, error) {
+	if lit, ok := obj.Literal(); ok {
+		if lit.Type() != XsdString {
+			return "", fmt.Errorf("literal is not a string but %s", lit.Type())
+		}
+
+		return lit.Value(), nil
+	}
+
+	return "", errors.New("cannot parse string: object is not literal")
+}
+
 func ParseInteger(obj Object) (int, error) {
 	if lit, ok := obj.Literal(); ok {
 		if lit.Type() != XsdInteger {

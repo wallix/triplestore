@@ -47,6 +47,14 @@ func TestParseObject(t *testing.T) {
 	}
 
 	tri = Subject("subject").Predicate("predicate").StringLiteral("rdf")
+	s, err := ParseString(tri.Object())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := s, "rdf"; got != want {
+		t.Fatalf("got %s, want %s", got, want)
+	}
+
 	lit, ok := tri.Object().Literal()
 	if got, want := ok, true; got != want {
 		t.Fatalf("got %t, want %t", got, want)
