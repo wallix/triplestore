@@ -3,22 +3,72 @@ package triplestore_test
 import (
 	"testing"
 
-	"github.com/wallix/triplestore"
+	tstore "github.com/wallix/triplestore"
 )
 
+func TestQueries(t *testing.T) {
+	all := []tstore.Triple{
+		tstore.SubjPred("one", "two").StringLiteral("three"),
+		tstore.SubjPred("four", "two").IntegerLiteral(42),
+		tstore.SubjPred("one", "two").Resource("four"),
+	}
+
+	s := tstore.New()
+	s.Add(all...)
+
+	g := s.Snapshot()
+
+	if got, want := g.Count(), len(all); got != want {
+		t.Fatalf("got %d, want %d", got, want)
+	}
+	if got, want := tstore.Triples(g.Triples()), tstore.Triples(all); !got.Equal(want) {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+
+	exp := tstore.Triples{all[0], all[2]}
+	if got, want := tstore.Triples(g.WithSubject("one")), exp; !got.Equal(want) {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+
+	exp = tstore.Triples{all[0], all[1], all[2]}
+	if got, want := tstore.Triples(g.WithPredicate("two")), exp; !got.Equal(want) {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+
+	exp = tstore.Triples{all[1]}
+	if got, want := tstore.Triples(g.WithObject(tstore.IntegerLiteral(42))), exp; !got.Equal(want) {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+
+	exp = tstore.Triples{all[2]}
+	if got, want := tstore.Triples(g.WithSubjObj("one", tstore.Resource("four"))), exp; !got.Equal(want) {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+
+	exp = tstore.Triples{all[0], all[2]}
+	if got, want := tstore.Triples(g.WithSubjPred("one", "two")), exp; !got.Equal(want) {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+
+	exp = tstore.Triples{all[0]}
+	if got, want := tstore.Triples(g.WithPredObj("two", tstore.StringLiteral("three"))), exp; !got.Equal(want) {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+}
+
 func TestStore(t *testing.T) {
-	s := triplestore.New()
+	s := tstore.New()
 	s.Add(
-		triplestore.SubjPred("one", "two").StringLiteral("three"),
-		triplestore.SubjPred("one", "two").Resource("four"),
-		triplestore.SubjPred("four", "two").IntegerLiteral(42),
-		triplestore.SubjPred("one", "two").Resource("four"),
+		tstore.SubjPred("one", "two").StringLiteral("three"),
+		tstore.SubjPred("one", "two").Resource("four"),
+		tstore.SubjPred("four", "two").IntegerLiteral(42),
+		tstore.SubjPred("one", "two").Resource("four"),
 	)
 	g := s.Snapshot()
-	expected := []triplestore.Triple{
-		triplestore.SubjPred("one", "two").StringLiteral("three"),
-		triplestore.SubjPred("one", "two").Resource("four"),
-		triplestore.SubjPred("four", "two").IntegerLiteral(42),
+	expected := []tstore.Triple{
+		tstore.SubjPred("one", "two").StringLiteral("three"),
+		tstore.SubjPred("one", "two").Resource("four"),
+		tstore.SubjPred("four", "two").IntegerLiteral(42),
 	}
 	if got, want := g.Count(), len(expected); got != want {
 		t.Fatalf("got %d, want %d", got, want)
@@ -28,7 +78,7 @@ func TestStore(t *testing.T) {
 			t.Fatalf("%v: got %t, want %t", tr, got, want)
 		}
 	}
-	s.Remove(triplestore.SubjPred("one", "two").Resource("four"))
+	s.Remove(tstore.SubjPred("one", "two").Resource("four"))
 	newG := s.Snapshot()
 
 	t.Run("old snapshot unmodified", func(t *testing.T) {

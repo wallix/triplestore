@@ -22,60 +22,77 @@ func SubjPred(s, p string) *tripleBuilder {
 	return &tripleBuilder{sub: s, pred: p}
 }
 
+func Resource(s string) Object {
+	return object{resourceID: s}
+
+}
 func (b *tripleBuilder) Resource(s string) *triple {
-	t := &triple{
+	return &triple{
 		sub:  subject(b.sub),
 		pred: predicate(b.pred),
-		obj:  object{resourceID: s},
+		obj:  Resource(s).(object),
 	}
-
-	return t
 }
-
-func (b *tripleBuilder) BooleanLiteral(bl bool) *triple {
-	t := &triple{sub: subject(b.sub), pred: predicate(b.pred)}
-
-	t.obj = object{
+func BooleanLiteral(bl bool) Object {
+	return object{
 		isLit: true,
 		lit:   literal{typ: XsdBoolean, val: fmt.Sprint(bl)},
 	}
-
-	return t
+}
+func (b *tripleBuilder) BooleanLiteral(bl bool) *triple {
+	return &triple{
+		sub:  subject(b.sub),
+		pred: predicate(b.pred),
+		obj:  BooleanLiteral(bl).(object),
+	}
 }
 
-func (b *tripleBuilder) IntegerLiteral(i int) *triple {
-	t := &triple{sub: subject(b.sub), pred: predicate(b.pred)}
-
-	t.obj = object{
+func IntegerLiteral(i int) Object {
+	return object{
 		isLit: true,
 		lit:   literal{typ: XsdInteger, val: fmt.Sprint(i)},
 	}
-
-	return t
 }
 
-func (b *tripleBuilder) StringLiteral(s string) *triple {
-	t := &triple{sub: subject(b.sub), pred: predicate(b.pred)}
+func (b *tripleBuilder) IntegerLiteral(i int) *triple {
+	return &triple{
+		sub:  subject(b.sub),
+		pred: predicate(b.pred),
+		obj:  IntegerLiteral(i).(object),
+	}
+}
 
-	t.obj = object{
+func StringLiteral(s string) Object {
+	return object{
 		isLit: true,
 		lit:   literal{typ: XsdString, val: s},
 	}
-
-	return t
 }
 
-func (b *tripleBuilder) DateTimeLiteral(tm time.Time) *triple {
-	t := &triple{sub: subject(b.sub), pred: predicate(b.pred)}
+func (b *tripleBuilder) StringLiteral(s string) *triple {
+	return &triple{
+		sub:  subject(b.sub),
+		pred: predicate(b.pred),
+		obj:  StringLiteral(s).(object),
+	}
+}
 
+func DateTimeLiteral(tm time.Time) Object {
 	text, err := tm.UTC().MarshalText()
 	if err != nil {
 		panic(fmt.Errorf("date time literal: %s", err))
 	}
-	t.obj = object{
+
+	return object{
 		isLit: true,
 		lit:   literal{typ: XsdDateTime, val: string(text)},
 	}
+}
 
-	return t
+func (b *tripleBuilder) DateTimeLiteral(tm time.Time) *triple {
+	return &triple{
+		sub:  subject(b.sub),
+		pred: predicate(b.pred),
+		obj:  DateTimeLiteral(tm).(object),
+	}
 }
