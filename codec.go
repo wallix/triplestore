@@ -20,6 +20,19 @@ type binaryEncoder struct {
 	w io.Writer
 }
 
+type wordLength uint16
+
+const (
+	resourceTypeEncoding = uint8(0)
+	literalTypeEncoding  = uint8(1)
+)
+
+var (
+	ErrSubjectTooLarge   = errors.New("subject is too large")
+	ErrPredicateTooLarge = errors.New("predicate is too large")
+	maxLengthWord        = int(^wordLength(0))
+)
+
 func NewBinaryEncoder(w io.Writer) Encoder {
 	return &binaryEncoder{w}
 }
@@ -44,22 +57,31 @@ func encodeTriple(t Triple) ([]byte, error) {
 
 	var buff bytes.Buffer
 
-	binary.Write(&buff, binary.BigEndian, uint8(len(sub)))
+	if len(sub) > maxLengthWord {
+		return []byte{}, ErrSubjectTooLarge
+	}
+	binary.Write(&buff, binary.BigEndian, wordLength(len(sub)))
 	buff.WriteString(sub)
-	binary.Write(&buff, binary.BigEndian, uint8(len(pred)))
+
+	if len(pred) > maxLengthWord {
+		return []byte{}, ErrPredicateTooLarge
+	}
+	binary.Write(&buff, binary.BigEndian, wordLength(len(pred)))
 	buff.WriteString(pred)
 
 	obj := t.Object()
 	if lit, isLit := obj.Literal(); isLit {
-		binary.Write(&buff, binary.BigEndian, uint8(1))
-		binary.Write(&buff, binary.BigEndian, lit.Type())
+		binary.Write(&buff, binary.BigEndian, literalTypeEncoding)
+		typ := lit.Type()
+		binary.Write(&buff, binary.BigEndian, wordLength(len(typ)))
+		buff.WriteString(string(typ))
 		litVal := lit.Value()
-		binary.Write(&buff, binary.BigEndian, uint8(len(litVal)))
+		binary.Write(&buff, binary.BigEndian, wordLength(len(litVal)))
 		buff.WriteString(litVal)
 	} else {
-		binary.Write(&buff, binary.BigEndian, uint8(0))
+		binary.Write(&buff, binary.BigEndian, resourceTypeEncoding)
 		resID, _ := obj.ResourceID()
-		binary.Write(&buff, binary.BigEndian, uint8(len(resID)))
+		binary.Write(&buff, binary.BigEndian, wordLength(len(resID)))
 		buff.WriteString(resID)
 	}
 
@@ -89,14 +111,14 @@ func (dec *binaryDecoder) Decode() ([]Triple, error) {
 }
 
 func (dec *binaryDecoder) decodeTriple() (bool, error) {
-	sub, err := dec.readLengthFirstWord()
+	sub, err := dec.readWord()
 	if err == io.EOF {
 		return true, nil
 	} else if err != nil {
 		return false, fmt.Errorf("subject: %s", err)
 	}
 
-	pred, err := dec.readLengthFirstWord()
+	pred, err := dec.readWord()
 	if err != nil {
 		return false, fmt.Errorf("predicate: %s", err)
 	}
@@ -107,8 +129,8 @@ func (dec *binaryDecoder) decodeTriple() (bool, error) {
 	}
 
 	var decodedObj object
-	if objType == uint8(0) {
-		resource, err := dec.readLengthFirstWord()
+	if objType == resourceTypeEncoding {
+		resource, err := dec.readWord()
 		if err != nil {
 			return false, fmt.Errorf("resource: %s", err)
 		}
@@ -118,13 +140,13 @@ func (dec *binaryDecoder) decodeTriple() (bool, error) {
 		decodedObj.isLit = true
 		var decodedLiteral literal
 
-		var litType uint8
-		if err := binary.Read(dec.r, binary.BigEndian, &litType); err != nil {
+		litType, err := dec.readWord()
+		if err != nil {
 			return false, fmt.Errorf("literate type: %s", err)
 		}
 		decodedLiteral.typ = XsdType(litType)
 
-		val, err := dec.readLengthFirstWord()
+		val, err := dec.readWord()
 		if err != nil {
 			return false, fmt.Errorf("literate: %s", err)
 		}
@@ -142,8 +164,8 @@ func (dec *binaryDecoder) decodeTriple() (bool, error) {
 	return true, nil
 }
 
-func (dec *binaryDecoder) readLengthFirstWord() ([]byte, error) {
-	var len uint8
+func (dec *binaryDecoder) readWord() ([]byte, error) {
+	var len wordLength
 	if err := binary.Read(dec.r, binary.BigEndian, &len); err != nil {
 		return nil, err
 	}

@@ -55,7 +55,7 @@ func TestParseObject(t *testing.T) {
 		t.Fatalf("got %s, want %s", got, want)
 	}
 	if got, want := lit.Type(), XsdString; got != want {
-		t.Fatalf("got %d, want %d", got, want)
+		t.Fatalf("got %s, want %s", got, want)
 	}
 
 	_, ok = tri.Object().ResourceID()
@@ -121,14 +121,14 @@ func TestTripleKey(t *testing.T) {
 		exp string
 	}{
 		{one: SubjPred("", "").Resource(""), exp: "<><><>"},
-		{one: SubjPred("", "").StringLiteral(""), exp: "<><>\"\"^^0"},
+		{one: SubjPred("", "").StringLiteral(""), exp: "<><>\"\"^^xsd:string"},
 		{one: SubjPred("sub", "pred").Resource("Bonobo"), exp: "<sub><pred><Bonobo>"},
 		{one: SubjPred("su<b", "pr>ed").Resource("Bonobo"), exp: "<su<b><pr>ed><Bonobo>"},
-		{one: SubjPred("sub", "pred").StringLiteral("Bonobo"), exp: "<sub><pred>\"Bonobo\"^^0"},
-		{one: SubjPred("sub", "pred").BooleanLiteral(true), exp: "<sub><pred>\"true\"^^1"},
-		{one: SubjPred("sub", "pred").StringLiteral("true"), exp: "<sub><pred>\"true\"^^0"},
-		{one: SubjPred("sub", "pred").IntegerLiteral(42), exp: "<sub><pred>\"42\"^^2"},
-		{one: SubjPred("sub", "pred").StringLiteral("42"), exp: "<sub><pred>\"42\"^^0"},
+		{one: SubjPred("sub", "pred").StringLiteral("Bonobo"), exp: "<sub><pred>\"Bonobo\"^^xsd:string"},
+		{one: SubjPred("sub", "pred").BooleanLiteral(true), exp: "<sub><pred>\"true\"^^xsd:boolean"},
+		{one: SubjPred("sub", "pred").StringLiteral("true"), exp: "<sub><pred>\"true\"^^xsd:string"},
+		{one: SubjPred("sub", "pred").IntegerLiteral(42), exp: "<sub><pred>\"42\"^^xsd:integer"},
+		{one: SubjPred("sub", "pred").StringLiteral("42"), exp: "<sub><pred>\"42\"^^xsd:string"},
 	}
 	for i, tcase := range tcases {
 		if got, want := tcase.one.key(), tcase.exp; got != want {

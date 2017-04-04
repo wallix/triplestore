@@ -20,13 +20,13 @@ type Literal interface {
 	Value() string
 }
 
-type XsdType uint8
+type XsdType string
 
 var (
-	XsdString   = XsdType(0)
-	XsdBoolean  = XsdType(1)
-	XsdInteger  = XsdType(2)
-	XsdDateTime = XsdType(3)
+	XsdString   = XsdType("xsd:string")
+	XsdBoolean  = XsdType("xsd:boolean")
+	XsdInteger  = XsdType("xsd:integer")
+	XsdDateTime = XsdType("xsd:datetime")
 )
 
 type subject string
@@ -85,7 +85,7 @@ func (o object) ResourceID() (string, bool) {
 
 func (o object) key() string {
 	if o.isLit {
-		return fmt.Sprintf("\"%s\"^^%d", o.lit.val, o.lit.typ)
+		return fmt.Sprintf("\"%s\"^^%s", o.lit.val, o.lit.typ)
 	}
 	return fmt.Sprintf("<%s>", o.resourceID)
 
