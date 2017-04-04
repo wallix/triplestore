@@ -114,3 +114,25 @@ func TestEquality(t *testing.T) {
 		}
 	}
 }
+
+func TestTripleKey(t *testing.T) {
+	tcases := []struct {
+		one *triple
+		exp string
+	}{
+		{one: SubjPred("", "").Resource(""), exp: "<><><>"},
+		{one: SubjPred("", "").StringLiteral(""), exp: "<><>\"\"^^0"},
+		{one: SubjPred("sub", "pred").Resource("Bonobo"), exp: "<sub><pred><Bonobo>"},
+		{one: SubjPred("su<b", "pr>ed").Resource("Bonobo"), exp: "<su<b><pr>ed><Bonobo>"},
+		{one: SubjPred("sub", "pred").StringLiteral("Bonobo"), exp: "<sub><pred>\"Bonobo\"^^0"},
+		{one: SubjPred("sub", "pred").BooleanLiteral(true), exp: "<sub><pred>\"true\"^^1"},
+		{one: SubjPred("sub", "pred").StringLiteral("true"), exp: "<sub><pred>\"true\"^^0"},
+		{one: SubjPred("sub", "pred").IntegerLiteral(42), exp: "<sub><pred>\"42\"^^2"},
+		{one: SubjPred("sub", "pred").StringLiteral("42"), exp: "<sub><pred>\"42\"^^0"},
+	}
+	for i, tcase := range tcases {
+		if got, want := tcase.one.key(), tcase.exp; got != want {
+			t.Errorf("%d: got %s, want %s", i+1, got, want)
+		}
+	}
+}
