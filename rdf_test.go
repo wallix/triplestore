@@ -15,6 +15,31 @@ func TestBuildTriple(t *testing.T) {
 	if got, want := tri.Predicate(), "predicate"; got != want {
 		t.Fatalf("got %s, want %s", got, want)
 	}
+
+}
+
+func TestBuildObjectFromInterface(t *testing.T) {
+	obj, _ := ObjectLiteral(true)
+	if got, want := obj, BooleanLiteral(true); got != want {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+	obj, _ = ObjectLiteral(5)
+	if got, want := obj, IntegerLiteral(5); got != want {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+	obj, _ = ObjectLiteral("any")
+	if got, want := obj, StringLiteral("any"); got != want {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+	now := time.Now()
+	obj, _ = ObjectLiteral(now)
+	if got, want := obj, DateTimeLiteral(now); got != want {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+	obj, _ = ObjectLiteral(&now)
+	if got, want := obj, DateTimeLiteral(now); got != want {
+		t.Fatalf("got %v, want %v", got, want)
+	}
 }
 
 func TestParseObject(t *testing.T) {

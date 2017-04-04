@@ -43,6 +43,23 @@ func (b *tripleBuilder) Object(o Object) *triple {
 	}
 }
 
+func ObjectLiteral(i interface{}) (Object, error) {
+	switch ii := i.(type) {
+	case string:
+		return StringLiteral(ii), nil
+	case bool:
+		return BooleanLiteral(ii), nil
+	case int:
+		return IntegerLiteral(ii), nil
+	case time.Time:
+		return DateTimeLiteral(ii), nil
+	case *time.Time:
+		return DateTimeLiteral(*ii), nil
+	default:
+		return nil, fmt.Errorf("unsupported literal type %T", i)
+	}
+}
+
 func BooleanLiteral(bl bool) Object {
 	return object{
 		isLit: true,
