@@ -26,6 +26,7 @@ func Resource(s string) Object {
 	return object{resourceID: s}
 
 }
+
 func (b *tripleBuilder) Resource(s string) *triple {
 	return &triple{
 		sub:  subject(b.sub),
@@ -33,12 +34,22 @@ func (b *tripleBuilder) Resource(s string) *triple {
 		obj:  Resource(s).(object),
 	}
 }
+
+func (b *tripleBuilder) Object(o Object) *triple {
+	return &triple{
+		sub:  subject(b.sub),
+		pred: predicate(b.pred),
+		obj:  o.(object),
+	}
+}
+
 func BooleanLiteral(bl bool) Object {
 	return object{
 		isLit: true,
 		lit:   literal{typ: XsdBoolean, val: fmt.Sprint(bl)},
 	}
 }
+
 func (b *tripleBuilder) BooleanLiteral(bl bool) *triple {
 	return &triple{
 		sub:  subject(b.sub),
