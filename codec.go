@@ -20,17 +20,11 @@ type binaryEncoder struct {
 	w io.Writer
 }
 
-type wordLength uint16
+type wordLength uint32
 
 const (
 	resourceTypeEncoding = uint8(0)
 	literalTypeEncoding  = uint8(1)
-)
-
-var (
-	ErrSubjectTooLarge   = errors.New("subject is too large")
-	ErrPredicateTooLarge = errors.New("predicate is too large")
-	maxLengthWord        = int(^wordLength(0))
 )
 
 func NewBinaryEncoder(w io.Writer) Encoder {
@@ -57,15 +51,9 @@ func encodeTriple(t Triple) ([]byte, error) {
 
 	var buff bytes.Buffer
 
-	if len(sub) > maxLengthWord {
-		return []byte{}, ErrSubjectTooLarge
-	}
 	binary.Write(&buff, binary.BigEndian, wordLength(len(sub)))
 	buff.WriteString(sub)
 
-	if len(pred) > maxLengthWord {
-		return []byte{}, ErrPredicateTooLarge
-	}
 	binary.Write(&buff, binary.BigEndian, wordLength(len(pred)))
 	buff.WriteString(pred)
 
@@ -75,6 +63,7 @@ func encodeTriple(t Triple) ([]byte, error) {
 		typ := lit.Type()
 		binary.Write(&buff, binary.BigEndian, wordLength(len(typ)))
 		buff.WriteString(string(typ))
+
 		litVal := lit.Value()
 		binary.Write(&buff, binary.BigEndian, wordLength(len(litVal)))
 		buff.WriteString(litVal)
