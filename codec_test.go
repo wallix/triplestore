@@ -124,7 +124,7 @@ func TestDecodeDataset(t *testing.T) {
 	firstFile.Seek(0, 0)
 	secondFile.Seek(0, 0)
 
-	dec := NewDataSetDecoder(NewBinaryDecoder, firstFile, secondFile)
+	dec := NewDatasetDecoder(NewBinaryDecoder, firstFile, secondFile)
 	tris, err := dec.Decode()
 	if err != nil {
 		t.Fatal(err)

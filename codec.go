@@ -22,7 +22,7 @@ type datasetDecoder struct {
 	rs             []io.Reader
 }
 
-func NewDataSetDecoder(fn func(io.Reader) Decoder, readers ...io.Reader) Decoder {
+func NewDatasetDecoder(fn func(io.Reader) Decoder, readers ...io.Reader) Decoder {
 	return &datasetDecoder{newDecoderFunc: fn, rs: readers}
 }
 

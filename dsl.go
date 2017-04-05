@@ -9,15 +9,6 @@ type tripleBuilder struct {
 	sub, pred string
 }
 
-func Subject(s string) *tripleBuilder {
-	return &tripleBuilder{sub: s}
-}
-
-func (b *tripleBuilder) Predicate(s string) *tripleBuilder {
-	b.pred = s
-	return b
-}
-
 func SubjPred(s, p string) *tripleBuilder {
 	return &tripleBuilder{sub: s, pred: p}
 }

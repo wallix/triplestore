@@ -6,7 +6,7 @@ import (
 )
 
 func TestBuildTriple(t *testing.T) {
-	tri := Subject("subject").Predicate("predicate").StringLiteral("any")
+	tri := SubjPred("subject", "predicate").StringLiteral("any")
 
 	if got, want := tri.Subject(), "subject"; got != want {
 		t.Fatalf("got %s, want %s", got, want)
@@ -47,7 +47,7 @@ func TestBuildObjectFromInterface(t *testing.T) {
 }
 
 func TestParseObject(t *testing.T) {
-	tri := Subject("subject").Predicate("predicate").IntegerLiteral(123)
+	tri := SubjPred("subject", "predicate").IntegerLiteral(123)
 	num, err := ParseInteger(tri.Object())
 	if err != nil {
 		t.Fatal(err)
@@ -56,7 +56,7 @@ func TestParseObject(t *testing.T) {
 		t.Fatalf("got %d, want %d", got, want)
 	}
 
-	tri = Subject("subject").Predicate("predicate").BooleanLiteral(true)
+	tri = SubjPred("subject", "predicate").BooleanLiteral(true)
 	b, err := ParseBoolean(tri.Object())
 	if err != nil {
 		t.Fatal(err)
@@ -66,7 +66,7 @@ func TestParseObject(t *testing.T) {
 	}
 
 	now := time.Now()
-	tri = Subject("subject").Predicate("predicate").DateTimeLiteral(now)
+	tri = SubjPred("subject", "predicate").DateTimeLiteral(now)
 	date, err := ParseDateTime(tri.Object())
 	if err != nil {
 		t.Fatal(err)
@@ -75,7 +75,7 @@ func TestParseObject(t *testing.T) {
 		t.Fatalf("got %s, want %s", got, want)
 	}
 
-	tri = Subject("subject").Predicate("predicate").StringLiteral("rdf")
+	tri = SubjPred("subject", "predicate").StringLiteral("rdf")
 	s, err := ParseString(tri.Object())
 	if err != nil {
 		t.Fatal(err)
@@ -102,7 +102,7 @@ func TestParseObject(t *testing.T) {
 }
 
 func TestParseResourceID(t *testing.T) {
-	tri := Subject("subject").Predicate("predicate").Resource("dbpedia:Bonobo")
+	tri := SubjPred("subject", "predicate").Resource("dbpedia:Bonobo")
 
 	rid, ok := tri.Object().ResourceID()
 	if got, want := ok, true; got != want {

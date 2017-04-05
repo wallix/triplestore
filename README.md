@@ -64,9 +64,8 @@ import (
 
 ```go
 triples = append(triples,
-	Subject("me").Predicate("name").StringLiteral("jsmith"),
- 	Subject("me").Predicate("age").IntegerLiteral(26),
- 	// or simply
+	SubjPred("me", "name").StringLiteral("jsmith"),
+ 	SubjPred("me", "age").IntegerLiteral(26),
  	SubjPred("me", "male").BooleanLiteral(true),
  	SubjPred("me", "born").DateTimeLiteral(time.Now()),
  	SubjPRed("me", "mother").Resource("mum#121287"),
@@ -78,8 +77,8 @@ Although you can build triples the way you want to model any data, they are usua
 Check if triples are equal:
 
 ```go
-	me := Subject("me").Predicate("name").StringLiteral("jsmith")
- 	you := Subject("me").Predicate("name").StringLiteral("fdupond")
+	me := SubjPred("me", "name").StringLiteral("jsmith")
+ 	you := SubjPred("me", "name").StringLiteral("fdupond")
 
  	if me.Equal(you) {
  	 	...
@@ -107,9 +106,9 @@ For example
 
 ```go
 triples = append(triples,
-	Subject("me").Predicate("name").StringLiteral("jsmith"),
+	SubjPred("me", "name").StringLiteral("jsmith"),
 	...
- 	Subject("me").Predicate("born").DateTimeLiteral(time.Now()),
+ 	SubjPred("me", "born").DateTimeLiteral(time.Now()),
 )
 
 enc := NewBinaryEncoder(myWriter)
