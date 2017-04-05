@@ -46,7 +46,7 @@ go get -u github.com/wallix/triplestore
 Test it:
 
 ```
-go test -v -cover github.com/wallix/triplestore
+go test -v -cover -race github.com/wallix/triplestore
 ```
 
 Import it in your source code:

@@ -1,6 +1,7 @@
 package triplestore_test
 
 import (
+	"sync"
 	"testing"
 
 	tstore "github.com/wallix/triplestore"
@@ -107,4 +108,28 @@ func TestStore(t *testing.T) {
 		}
 	})
 
+}
+
+func TestStoreConcurrentAccess(t *testing.T) {
+	s := tstore.New()
+	any := tstore.SubjPred("", "").StringLiteral("")
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for i := 0; i < 10; i++ {
+			s.Add(any)
+		}
+	}()
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for i := 0; i < 10; i++ {
+			s.Add(any)
+		}
+	}()
+
+	wg.Wait()
 }

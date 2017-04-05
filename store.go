@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+	"sync"
 )
 
 type Store interface {
@@ -59,6 +60,7 @@ func (ts Triples) String() string {
 }
 
 type store struct {
+	mu      sync.RWMutex
 	triples map[string]Triple
 }
 
@@ -67,12 +69,18 @@ func New() *store {
 }
 
 func (s *store) Add(ts ...Triple) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	for _, t := range ts {
 		tr := t.(*triple)
 		s.triples[tr.key()] = t
 	}
 }
 func (s *store) Remove(ts ...Triple) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	for _, t := range ts {
 		tr := t.(*triple)
 		delete(s.triples, tr.key())
@@ -89,6 +97,8 @@ func (s *store) Snapshot() RDFGraph {
 		po:  make(map[string][]Triple),
 		spo: make(map[string]Triple),
 	}
+
+	s.mu.RLock()
 	for k, t := range s.triples {
 		obj := t.Object().(object)
 		gph.s[t.Subject()] = append(gph.s[t.Subject()], t)
@@ -106,6 +116,7 @@ func (s *store) Snapshot() RDFGraph {
 
 		gph.spo[k] = t
 	}
+	s.mu.RUnlock()
 
 	for _, t := range gph.spo {
 		gph.unique = append(gph.unique, t)
