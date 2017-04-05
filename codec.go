@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"sync"
 )
 
 type Encoder interface {
@@ -14,6 +15,54 @@ type Encoder interface {
 
 type Decoder interface {
 	Decode() ([]Triple, error)
+}
+
+type datasetDecoder struct {
+	newDecoderFunc func(io.Reader) Decoder
+	rs             []io.Reader
+}
+
+func NewDataSetDecoder(fn func(io.Reader) Decoder, readers ...io.Reader) Decoder {
+	return &datasetDecoder{newDecoderFunc: fn, rs: readers}
+}
+
+func (dec *datasetDecoder) Decode() ([]Triple, error) {
+	type result struct {
+		err  error
+		tris []Triple
+	}
+
+	results := make(chan *result, len(dec.rs))
+
+	var wg sync.WaitGroup
+	for _, reader := range dec.rs {
+		wg.Add(1)
+		go func(r io.Reader) {
+			defer wg.Done()
+			tris, err := dec.newDecoderFunc(r).Decode()
+			results <- &result{tris: tris, err: err}
+		}(reader)
+	}
+
+	go func() {
+		wg.Wait()
+		close(results)
+	}()
+
+	var all []Triple
+	var errs []error
+	for r := range results {
+		if r.err != nil {
+			errs = append(errs, r.err)
+		}
+		all = append(all, r.tris...)
+	}
+
+	if len(errs) > 0 {
+		return all, errs[0]
+	}
+
+	return all, nil
 }
 
 type binaryEncoder struct {
@@ -150,7 +199,7 @@ func (dec *binaryDecoder) decodeTriple() (bool, error) {
 		obj:  decodedObj,
 	})
 
-	return true, nil
+	return false, nil
 }
 
 func (dec *binaryDecoder) readWord() ([]byte, error) {
@@ -161,7 +210,7 @@ func (dec *binaryDecoder) readWord() ([]byte, error) {
 
 	word := make([]byte, len)
 	if _, err := io.ReadFull(dec.r, word); err != nil {
-		return nil, errors.New("cannot decode length first word")
+		return nil, errors.New("triplestore: binary: cannot decode word")
 	}
 
 	return word, nil

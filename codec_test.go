@@ -2,7 +2,9 @@ package triplestore
 
 import (
 	"bytes"
+	"io/ioutil"
 	"math"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -57,6 +59,90 @@ func TestEncodeAndDecodeAllTripleTypes(t *testing.T) {
 		if got, want := tcase.in, all[0]; !got.Equal(want) {
 			t.Fatalf("case %v: \ngot\n%v\nwant\n%v\n", tcase.in, got, want)
 		}
+	}
+}
+
+func TestEncodeDecodeOnFile(t *testing.T) {
+	one := SubjPred("one", "pred1").StringLiteral("lit1")
+	two := SubjPred("two", "pred2").StringLiteral("lit2")
+
+	file, err := ioutil.TempFile("", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(file.Name())
+
+	if err := NewBinaryEncoder(file).Encode(one, two); err != nil {
+		t.Fatal(err)
+	}
+
+	file.Seek(0, 0)
+	tris, err := NewBinaryDecoder(file).Decode()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := len(tris), 2; got != want {
+		t.Fatalf("got %d, want %d", got, want)
+	}
+
+	s := New()
+	s.Add(tris...)
+	snap := s.Snapshot()
+
+	if !snap.Contains(one) {
+		t.Fatalf("decoded file should contains %v", one)
+	}
+	if !snap.Contains(two) {
+		t.Fatalf("decoded file should contains %v", two)
+	}
+}
+
+func TestDecodeDataset(t *testing.T) {
+	one := SubjPred("one", "pred1").StringLiteral("lit1")
+	two := SubjPred("two", "pred2").StringLiteral("lit2")
+
+	firstFile, err := ioutil.TempFile("", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(firstFile.Name())
+
+	secondFile, err := ioutil.TempFile("", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(secondFile.Name())
+
+	if err := NewBinaryEncoder(firstFile).Encode(one); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := NewBinaryEncoder(secondFile).Encode(two); err != nil {
+		t.Fatal(err)
+	}
+
+	firstFile.Seek(0, 0)
+	secondFile.Seek(0, 0)
+
+	dec := NewDataSetDecoder(NewBinaryDecoder, firstFile, secondFile)
+	tris, err := dec.Decode()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	s := New()
+	s.Add(tris...)
+	snap := s.Snapshot()
+	if got, want := snap.Count(), 2; got != want {
+		t.Fatalf("got %d, want %d", got, want)
+	}
+
+	if !snap.Contains(one) {
+		t.Fatalf("decoded dataset should contains %v", one)
+	}
+
+	if !snap.Contains(two) {
+		t.Fatalf("decoded dataset should contains %v", two)
 	}
 }
 
