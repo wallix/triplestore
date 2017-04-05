@@ -51,6 +51,8 @@ func ObjectLiteral(i interface{}) (Object, error) {
 		return BooleanLiteral(ii), nil
 	case int:
 		return IntegerLiteral(ii), nil
+	case int64:
+		return IntegerLiteral(int(ii)), nil
 	case time.Time:
 		return DateTimeLiteral(ii), nil
 	case *time.Time:

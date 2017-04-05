@@ -27,6 +27,10 @@ func TestBuildObjectFromInterface(t *testing.T) {
 	if got, want := obj, IntegerLiteral(5); got != want {
 		t.Fatalf("got %v, want %v", got, want)
 	}
+	obj, _ = ObjectLiteral(int64(5))
+	if got, want := obj, IntegerLiteral(5); got != want {
+		t.Fatalf("got %v, want %v", got, want)
+	}
 	obj, _ = ObjectLiteral("any")
 	if got, want := obj, StringLiteral("any"); got != want {
 		t.Fatalf("got %v, want %v", got, want)
