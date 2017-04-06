@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"strings"
 	"sync"
+	"sync/atomic"
 )
 
 type Store interface {
@@ -60,17 +61,35 @@ func (ts Triples) String() string {
 }
 
 type store struct {
-	mu      sync.RWMutex
-	triples map[string]Triple
+	latestSnap RDFGraph
+	updated    uint32 // atomic
+	mu         sync.RWMutex
+	triples    map[string]Triple
 }
 
 func New() *store {
-	return &store{triples: make(map[string]Triple)}
+	return &store{
+		triples:    make(map[string]Triple),
+		latestSnap: newGraph(0),
+	}
+}
+
+func (s *store) isUpdated() bool {
+	return atomic.LoadUint32(&s.updated) > 0
+}
+
+func (s *store) update() {
+	atomic.StoreUint32(&s.updated, uint32(1))
+}
+
+func (s *store) reset() {
+	atomic.StoreUint32(&s.updated, uint32(0))
 }
 
 func (s *store) Add(ts ...Triple) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	defer s.update()
 
 	for _, t := range ts {
 		tr := t.(*triple)
@@ -80,6 +99,7 @@ func (s *store) Add(ts ...Triple) {
 func (s *store) Remove(ts ...Triple) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	defer s.update()
 
 	for _, t := range ts {
 		tr := t.(*triple)
@@ -88,35 +108,38 @@ func (s *store) Remove(ts ...Triple) {
 }
 
 func (s *store) Snapshot() RDFGraph {
-	gph := &graph{
-		s:   make(map[string][]Triple),
-		p:   make(map[string][]Triple),
-		o:   make(map[string][]Triple),
-		sp:  make(map[string][]Triple),
-		so:  make(map[string][]Triple),
-		po:  make(map[string][]Triple),
-		spo: make(map[string]Triple),
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	if !s.isUpdated() {
+		return s.latestSnap
 	}
 
-	s.mu.RLock()
-	for k, t := range s.triples {
-		obj := t.Object().(object)
-		gph.s[t.Subject()] = append(gph.s[t.Subject()], t)
-		gph.p[t.Predicate()] = append(gph.p[t.Predicate()], t)
-		gph.o[obj.key()] = append(gph.o[obj.key()], t)
+	gph := newGraph(len(s.triples))
+	defer func() {
+		s.latestSnap = gph
+		s.reset()
+	}()
 
-		sp := fmt.Sprintf("%s%s", t.Subject(), t.Predicate())
+	for k, t := range s.triples {
+		objKey := t.Object().(object).key()
+		sub, pred := t.Subject(), t.Predicate()
+
+		gph.s[sub] = append(gph.s[sub], t)
+		gph.p[pred] = append(gph.p[pred], t)
+		gph.o[objKey] = append(gph.o[objKey], t)
+
+		sp := sub + pred
 		gph.sp[sp] = append(gph.sp[sp], t)
 
-		so := fmt.Sprintf("%s%s", t.Subject(), obj.key())
+		so := sub + objKey
 		gph.so[so] = append(gph.so[so], t)
 
-		po := fmt.Sprintf("%s%s", t.Predicate(), obj.key())
+		po := pred + objKey
 		gph.po[po] = append(gph.po[po], t)
 
 		gph.spo[k] = t
 	}
-	s.mu.RUnlock()
 
 	for _, t := range gph.spo {
 		gph.unique = append(gph.unique, t)
@@ -126,14 +149,22 @@ func (s *store) Snapshot() RDFGraph {
 }
 
 type graph struct {
-	unique []Triple
-	s      map[string][]Triple
-	p      map[string][]Triple
-	o      map[string][]Triple
-	sp     map[string][]Triple
-	so     map[string][]Triple
-	po     map[string][]Triple
-	spo    map[string]Triple
+	unique     []Triple
+	s, p, o    map[string][]Triple
+	sp, so, po map[string][]Triple
+	spo        map[string]Triple
+}
+
+func newGraph(cap int) *graph {
+	return &graph{
+		s:   make(map[string][]Triple, cap),
+		p:   make(map[string][]Triple, cap),
+		o:   make(map[string][]Triple, cap),
+		sp:  make(map[string][]Triple, cap),
+		so:  make(map[string][]Triple, cap),
+		po:  make(map[string][]Triple, cap),
+		spo: make(map[string]Triple, cap),
+	}
 }
 
 func (g *graph) Contains(t Triple) bool {

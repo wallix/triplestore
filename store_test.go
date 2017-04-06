@@ -1,6 +1,7 @@
 package triplestore_test
 
 import (
+	"fmt"
 	"sync"
 	"testing"
 
@@ -132,4 +133,31 @@ func TestStoreConcurrentAccess(t *testing.T) {
 	}()
 
 	wg.Wait()
+}
+
+// BenchmarkSnapshotSource-4   	       1	7462513791 ns/op
+func BenchmarkSnapshotSource(b *testing.B) {
+	s := tstore.New()
+	for i := 0; i < 100000; i++ {
+		num := fmt.Sprint(i)
+		tri := tstore.SubjPred(num, num).IntegerLiteral(i)
+		s.Add(tri)
+	}
+
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		for i := 0; i < 10; i++ {
+			num := fmt.Sprint(i)
+			tri := tstore.SubjPred(num, num).IntegerLiteral(i)
+			s.Add(tri)
+			s.Snapshot()
+			s.Snapshot()
+			s.Snapshot()
+			s.Remove(tri)
+			s.Snapshot()
+			s.Snapshot()
+			s.Snapshot()
+		}
+	}
 }

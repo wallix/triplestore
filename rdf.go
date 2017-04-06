@@ -1,7 +1,5 @@
 package triplestore
 
-import "fmt"
-
 type Triple interface {
 	Subject() string
 	Predicate() string
@@ -24,9 +22,10 @@ type subject string
 type predicate string
 
 type triple struct {
-	sub  subject
-	pred predicate
-	obj  object
+	sub    subject
+	pred   predicate
+	obj    object
+	triKey string
 }
 
 func (t *triple) Object() Object {
@@ -42,7 +41,10 @@ func (t *triple) Predicate() string {
 }
 
 func (t *triple) key() string {
-	return fmt.Sprintf("<%s><%s>%s", t.sub, t.pred, t.obj.key())
+	if t.triKey == "" {
+		t.triKey = "<" + string(t.sub) + "><" + string(t.pred) + ">" + t.obj.key()
+	}
+	return t.triKey
 }
 
 func (t *triple) Equal(other Triple) bool {
@@ -76,10 +78,9 @@ func (o object) ResourceID() (string, bool) {
 
 func (o object) key() string {
 	if o.isLit {
-		return fmt.Sprintf("\"%s\"^^%s", o.lit.val, o.lit.typ)
+		return "\"" + o.lit.val + "\"^^" + string(o.lit.typ)
 	}
-	return fmt.Sprintf("<%s>", o.resourceID)
-
+	return "<" + o.resourceID + ">"
 }
 
 func (o object) Equal(other Object) bool {
