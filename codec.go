@@ -33,6 +33,8 @@ func (dec *datasetDecoder) Decode() ([]Triple, error) {
 	}
 
 	results := make(chan *result, len(dec.rs))
+	done := make(chan struct{})
+	defer close(done)
 
 	var wg sync.WaitGroup
 	for _, reader := range dec.rs {
@@ -40,7 +42,11 @@ func (dec *datasetDecoder) Decode() ([]Triple, error) {
 		go func(r io.Reader) {
 			defer wg.Done()
 			tris, err := dec.newDecoderFunc(r).Decode()
-			results <- &result{tris: tris, err: err}
+			select {
+			case results <- &result{tris: tris, err: err}:
+			case <-done:
+				return
+			}
 		}(reader)
 	}
 
@@ -50,16 +56,11 @@ func (dec *datasetDecoder) Decode() ([]Triple, error) {
 	}()
 
 	var all []Triple
-	var errs []error
 	for r := range results {
 		if r.err != nil {
-			errs = append(errs, r.err)
+			return all, r.err
 		}
 		all = append(all, r.tris...)
-	}
-
-	if len(errs) > 0 {
-		return all, errs[0]
 	}
 
 	return all, nil
