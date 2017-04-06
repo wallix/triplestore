@@ -72,7 +72,7 @@ func TestEncodeDecodeOnFile(t *testing.T) {
 	}
 	defer os.Remove(file.Name())
 
-	if err := NewBinaryEncoder(file).Encode(one, two); err != nil {
+	if err = NewBinaryEncoder(file).Encode(one, two); err != nil {
 		t.Fatal(err)
 	}
 
@@ -113,11 +113,11 @@ func TestDecodeDataset(t *testing.T) {
 	}
 	defer os.Remove(secondFile.Name())
 
-	if err := NewBinaryEncoder(firstFile).Encode(one); err != nil {
+	if err = NewBinaryEncoder(firstFile).Encode(one); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := NewBinaryEncoder(secondFile).Encode(two); err != nil {
+	if err = NewBinaryEncoder(secondFile).Encode(two); err != nil {
 		t.Fatal(err)
 	}
 

@@ -55,6 +55,13 @@ func TestParseObject(t *testing.T) {
 	if got, want := num, 123; got != want {
 		t.Fatalf("got %d, want %d", got, want)
 	}
+	numInt, err := ParseLiteral(tri.Object())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := numInt, 123; got != want {
+		t.Fatalf("got %d, want %d", got, want)
+	}
 
 	tri = SubjPred("subject", "predicate").BooleanLiteral(true)
 	b, err := ParseBoolean(tri.Object())
@@ -62,6 +69,15 @@ func TestParseObject(t *testing.T) {
 		t.Fatal(err)
 	}
 	if got, want := b, true; got != want {
+		t.Fatalf("got %t, want %t", got, want)
+	}
+
+	tri = SubjPred("subject", "predicate").BooleanLiteral(true)
+	bInt, err := ParseLiteral(tri.Object())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := bInt, true; got != want {
 		t.Fatalf("got %t, want %t", got, want)
 	}
 
@@ -75,12 +91,29 @@ func TestParseObject(t *testing.T) {
 		t.Fatalf("got %s, want %s", got, want)
 	}
 
+	tri = SubjPred("subject", "predicate").DateTimeLiteral(now)
+	dateInt, err := ParseLiteral(tri.Object())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := dateInt, now.UTC(); got != want {
+		t.Fatalf("got %s, want %s", got, want)
+	}
+
 	tri = SubjPred("subject", "predicate").StringLiteral("rdf")
 	s, err := ParseString(tri.Object())
 	if err != nil {
 		t.Fatal(err)
 	}
 	if got, want := s, "rdf"; got != want {
+		t.Fatalf("got %s, want %s", got, want)
+	}
+	tri = SubjPred("subject", "predicate").StringLiteral("rdf")
+	sInt, err := ParseLiteral(tri.Object())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := sInt, "rdf"; got != want {
 		t.Fatalf("got %s, want %s", got, want)
 	}
 

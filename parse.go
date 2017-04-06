@@ -59,3 +59,21 @@ func ParseDateTime(obj Object) (time.Time, error) {
 
 	return t, errors.New("cannot parse dateTime: object is not literal")
 }
+
+func ParseLiteral(obj Object) (interface{}, error) {
+	if lit, ok := obj.Literal(); ok {
+		switch lit.Type() {
+		case XsdBoolean:
+			return ParseBoolean(obj)
+		case XsdDateTime:
+			return ParseDateTime(obj)
+		case XsdInteger:
+			return ParseInteger(obj)
+		case XsdString:
+			return ParseString(obj)
+		default:
+			return nil, fmt.Errorf("unknown literal type: %s", lit.Type())
+		}
+	}
+	return nil, errors.New("cannot parse literal: object is not literal")
+}
