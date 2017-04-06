@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 	"sync"
 )
 
@@ -15,6 +16,23 @@ type Encoder interface {
 
 type Decoder interface {
 	Decode() ([]Triple, error)
+}
+
+func NewContext() *Context {
+	return &Context{Prefixes: make(map[string]string)}
+}
+
+type Context struct {
+	Base     string
+	Prefixes map[string]string
+}
+
+var RDFContext = &Context{
+	Prefixes: map[string]string{
+		"xsd":  "http://www.w3.org/2001/XMLSchema#",
+		"rdf":  "http://www.w3.org/1999/02/22-rdf-syntax-ns#",
+		"rdfs": "http://www.w3.org/2000/01/rdf-schema#",
+	},
 }
 
 type datasetDecoder struct {
@@ -225,18 +243,23 @@ func (dec *binaryDecoder) readWord() ([]byte, error) {
 
 type ntriplesEncoder struct {
 	w io.Writer
+	c *Context
 }
 
 func NewNTriplesEncoder(w io.Writer) Encoder {
-	return &ntriplesEncoder{w}
+	return &ntriplesEncoder{w: w}
+}
+
+func NewNTriplesEncoderWithContext(w io.Writer, c *Context) Encoder {
+	return &ntriplesEncoder{w: w, c: c}
 }
 
 func (enc *ntriplesEncoder) Encode(tris ...Triple) error {
 	var buff bytes.Buffer
 	for _, t := range tris {
-		buff.WriteString(fmt.Sprintf("<%s> <%s> ", t.Subject(), t.Predicate()))
+		buff.WriteString(fmt.Sprintf("<%s> <%s> ", enc.buildIRI(t.Subject()), enc.buildIRI(t.Predicate())))
 		if rid, ok := t.Object().ResourceID(); ok {
-			buff.WriteString(fmt.Sprintf("<%s>", rid))
+			buff.WriteString(fmt.Sprintf("<%s>", enc.buildIRI(rid)))
 		}
 		if lit, ok := t.Object().Literal(); ok {
 			var namespace string
@@ -254,4 +277,22 @@ func (enc *ntriplesEncoder) Encode(tris ...Triple) error {
 
 	_, err := enc.w.Write(buff.Bytes())
 	return err
+}
+
+func (enc *ntriplesEncoder) buildIRI(id string) string {
+	if enc.c != nil {
+		if enc.c.Prefixes != nil {
+			for k, uri := range enc.c.Prefixes {
+				prefix := k + ":"
+				if strings.HasPrefix(id, prefix) {
+					id = uri + strings.TrimLeft(id, prefix)
+					continue
+				}
+			}
+		}
+		if !strings.HasPrefix(id, "http") && enc.c.Base != "" {
+			id = enc.c.Base + id
+		}
+	}
+	return id
 }

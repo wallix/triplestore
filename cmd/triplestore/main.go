@@ -12,11 +12,18 @@ import (
 )
 
 var filesFlag arrayFlags
-var outFormat string
+var outFormatFlag string
+
+var useRdfPrefixesFlag bool
+var prefixesFlag arrayFlags
+var baseFlag string
 
 func init() {
-	flag.StringVar(&outFormat, "out-format", "ntriples", "output format (ntriples, bin)")
+	flag.StringVar(&outFormatFlag, "out-format", "ntriples", "output format (ntriples, bin)")
 	flag.Var(&filesFlag, "in", "input file paths")
+	flag.BoolVar(&useRdfPrefixesFlag, "rdf-prefixes", false, "use default RDF prefixes (rdf, rdfs, xsd)")
+	flag.Var(&prefixesFlag, "prefix", "RDF custom prefixes (format: \"prefix:http://my.uri\"")
+	flag.StringVar(&baseFlag, "base", "", "RDF custom base prefix")
 }
 
 func main() {
@@ -24,13 +31,35 @@ func main() {
 	if len(filesFlag) == 0 {
 		log.Fatal("need at list an argument `-in INPUT_FILE`")
 	}
-	err := convert(filesFlag, outFormat)
+	context, err := buildContext(useRdfPrefixesFlag, prefixesFlag, baseFlag)
+	if err != nil {
+		log.Fatal(err)
+	}
+	err = convert(filesFlag, outFormatFlag, context)
 	if err != nil {
 		log.Fatal(err)
 	}
 }
 
-func convert(inFilePaths []string, outFormat string) error {
+func buildContext(useRdfPrefixes bool, prefixes []string, base string) (*tstore.Context, error) {
+	var context *tstore.Context
+	if useRdfPrefixes {
+		context = tstore.RDFContext
+	} else {
+		context = tstore.NewContext()
+	}
+	for _, prefix := range prefixes {
+		splits := strings.SplitN(prefix, ":", 2)
+		if splits[0] == "" || splits[1] == "" {
+			return context, fmt.Errorf("invalid prefix format: '%s'. expected \"prefix:http://my.uri\"", prefix)
+		}
+		context.Prefixes[splits[0]] = splits[1]
+	}
+	context.Base = base
+	return context, nil
+}
+
+func convert(inFilePaths []string, outFormatFlag string, context *tstore.Context) error {
 	var inFiles []io.Reader
 	for _, inFilePath := range inFilePaths {
 		in, err := os.Open(inFilePath)
@@ -46,13 +75,13 @@ func convert(inFilePaths []string, outFormat string) error {
 	}
 
 	var encoder tstore.Encoder
-	switch outFormat {
+	switch outFormatFlag {
 	case "ntriples":
-		encoder = tstore.NewNTriplesEncoder(os.Stdout)
+		encoder = tstore.NewNTriplesEncoderWithContext(os.Stdout, context)
 	case "bin":
 		encoder = tstore.NewBinaryEncoder(os.Stdout)
 	default:
-		return fmt.Errorf("unknown format %s, expected either 'ntriples' or 'bin'", outFormat)
+		return fmt.Errorf("unknown format %s, expected either 'ntriples' or 'bin'", outFormatFlag)
 	}
 	err = encoder.Encode(triples...)
 	if err != nil {

@@ -148,15 +148,15 @@ func TestDecodeDataset(t *testing.T) {
 
 func TestEncodeNTriples(t *testing.T) {
 	triples := []Triple{
-		SubjPred("http://test.url#one", "http://www.w3.org/1999/02/22-rdf-syntax-ns#type").Resource("http://test.url#onetype"),
-		SubjPred("http://test.url#one", "http://test.url#prop1").StringLiteral("two"),
-		SubjPred("http://test.url#one", "http://test.url#prop2").IntegerLiteral(284765293570),
-		SubjPred("http://test.url#one", "http://test.url#prop3").BooleanLiteral(true),
-		SubjPred("http://test.url#one", "http://test.url#prop4").DateTimeLiteral(time.Unix(1233456789, 0).UTC()),
+		SubjPred("one", "rdf:type").Resource("onetype"),
+		SubjPred("one", "prop1").StringLiteral("two"),
+		SubjPred("one", "prop2").IntegerLiteral(284765293570),
+		SubjPred("one", "prop3").BooleanLiteral(true),
+		SubjPred("one", "prop4").DateTimeLiteral(time.Unix(1233456789, 0).UTC()),
 	}
 
 	var buff bytes.Buffer
-	enc := NewNTriplesEncoder(&buff)
+	enc := NewNTriplesEncoderWithContext(&buff, &Context{Base: "http://test.url#", Prefixes: map[string]string{"rdf": "http://www.w3.org/1999/02/22-rdf-syntax-ns#"}})
 	if err := enc.Encode(triples...); err != nil {
 		t.Fatal(err)
 	}
