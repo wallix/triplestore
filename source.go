@@ -188,11 +188,11 @@ func (g *graph) WithObject(o Object) []Triple {
 	return g.o[o.(object).key()]
 }
 func (g *graph) WithSubjObj(s string, o Object) []Triple {
-	return g.so[fmt.Sprintf("%s%s", s, o.(object).key())]
+	return g.so[s+o.(object).key()]
 }
 func (g *graph) WithSubjPred(s, p string) []Triple {
-	return g.sp[fmt.Sprintf("%s%s", s, p)]
+	return g.sp[s+p]
 }
 func (g *graph) WithPredObj(p string, o Object) []Triple {
-	return g.po[fmt.Sprintf("%s%s", p, o.(object).key())]
+	return g.po[p+o.(object).key()]
 }
