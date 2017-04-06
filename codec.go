@@ -3,9 +3,9 @@ package triplestore
 import (
 	"bytes"
 	"encoding/binary"
-	"errors"
 	"fmt"
 	"io"
+	"os"
 	"sync"
 )
 
@@ -28,8 +28,9 @@ func NewDatasetDecoder(fn func(io.Reader) Decoder, readers ...io.Reader) Decoder
 
 func (dec *datasetDecoder) Decode() ([]Triple, error) {
 	type result struct {
-		err  error
-		tris []Triple
+		err    error
+		tris   []Triple
+		reader io.Reader
 	}
 
 	results := make(chan *result, len(dec.rs))
@@ -43,7 +44,7 @@ func (dec *datasetDecoder) Decode() ([]Triple, error) {
 			defer wg.Done()
 			tris, err := dec.newDecoderFunc(r).Decode()
 			select {
-			case results <- &result{tris: tris, err: err}:
+			case results <- &result{tris: tris, err: err, reader: r}:
 			case <-done:
 				return
 			}
@@ -58,7 +59,12 @@ func (dec *datasetDecoder) Decode() ([]Triple, error) {
 	var all []Triple
 	for r := range results {
 		if r.err != nil {
-			return all, r.err
+			switch rr := r.reader.(type) {
+			case *os.File:
+				return all, fmt.Errorf("file '%s': %s", rr.Name(), r.err)
+			default:
+				return all, r.err
+			}
 		}
 		all = append(all, r.tris...)
 	}
@@ -211,7 +217,7 @@ func (dec *binaryDecoder) readWord() ([]byte, error) {
 
 	word := make([]byte, len)
 	if _, err := io.ReadFull(dec.r, word); err != nil {
-		return nil, errors.New("triplestore: binary: cannot decode word")
+		return nil, fmt.Errorf("triplestore: binary: cannot decode word of length %d bytes: %s", len, err)
 	}
 
 	return word, nil
