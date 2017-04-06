@@ -226,31 +226,26 @@ func NewNTriplesEncoder(w io.Writer) Encoder {
 }
 
 func (enc *ntriplesEncoder) Encode(tris ...Triple) error {
+	var buff bytes.Buffer
 	for _, t := range tris {
-		var buff bytes.Buffer
-
 		buff.WriteString(fmt.Sprintf("<%s> <%s> ", t.Subject(), t.Predicate()))
 		if rid, ok := t.Object().ResourceID(); ok {
 			buff.WriteString(fmt.Sprintf("<%s>", rid))
 		}
 		if lit, ok := t.Object().Literal(); ok {
-			var litType string
+			var namespace string
 			switch lit.Type() {
-			case XsdBoolean:
-				litType = "^^<http://www.w3.org/2001/XMLSchema#boolean>"
-			case XsdDateTime:
-				litType = "^^<http://www.w3.org/2001/XMLSchema#dateTime>"
-			case XsdInteger:
-				litType = "^^<http://www.w3.org/2001/XMLSchema#integer>"
+			case XsdString:
+				// namespace empty as per spec
+			default:
+				namespace = lit.Type().NTriplesNamespaced()
 			}
-			buff.WriteString(fmt.Sprintf("\"%s\"%s", lit.Value(), litType))
+
+			buff.WriteString(fmt.Sprintf("\"%s\"%s", lit.Value(), namespace))
 		}
 		buff.WriteString(" .\n")
-
-		if _, err := enc.w.Write(buff.Bytes()); err != nil {
-			return err
-		}
 	}
 
-	return nil
+	_, err := enc.w.Write(buff.Bytes())
+	return err
 }

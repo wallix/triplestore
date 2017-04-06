@@ -20,15 +20,6 @@ type Literal interface {
 	Value() string
 }
 
-type XsdType string
-
-var (
-	XsdString   = XsdType("xsd:string")
-	XsdBoolean  = XsdType("xsd:boolean")
-	XsdInteger  = XsdType("xsd:integer")
-	XsdDateTime = XsdType("xsd:datetime")
-)
-
 type subject string
 type predicate string
 
