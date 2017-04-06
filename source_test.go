@@ -15,7 +15,7 @@ func TestQueries(t *testing.T) {
 		tstore.SubjPred("one", "two").Resource("four"),
 	}
 
-	s := tstore.New()
+	s := tstore.NewSource()
 	s.Add(all...)
 
 	g := s.Snapshot()
@@ -58,8 +58,8 @@ func TestQueries(t *testing.T) {
 	}
 }
 
-func TestStore(t *testing.T) {
-	s := tstore.New()
+func TestSource(t *testing.T) {
+	s := tstore.NewSource()
 	s.Add(
 		tstore.SubjPred("one", "two").StringLiteral("three"),
 		tstore.SubjPred("one", "two").Resource("four"),
@@ -112,7 +112,7 @@ func TestStore(t *testing.T) {
 }
 
 func TestStoreConcurrentAccess(t *testing.T) {
-	s := tstore.New()
+	s := tstore.NewSource()
 	any := tstore.SubjPred("", "").StringLiteral("")
 
 	var wg sync.WaitGroup
@@ -137,7 +137,7 @@ func TestStoreConcurrentAccess(t *testing.T) {
 
 // BenchmarkSnapshotSource-4   	       1	7462513791 ns/op
 func BenchmarkSnapshotSource(b *testing.B) {
-	s := tstore.New()
+	s := tstore.NewSource()
 	for i := 0; i < 100000; i++ {
 		num := fmt.Sprint(i)
 		tri := tstore.SubjPred(num, num).IntegerLiteral(i)

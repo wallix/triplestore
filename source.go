@@ -8,7 +8,7 @@ import (
 	"sync/atomic"
 )
 
-type Store interface {
+type Source interface {
 	Add(...Triple)
 	Remove(...Triple)
 	Snapshot() RDFGraph
@@ -60,33 +60,33 @@ func (ts Triples) String() string {
 	return fmt.Sprintf("[%s]", joined)
 }
 
-type store struct {
+type source struct {
 	latestSnap RDFGraph
 	updated    uint32 // atomic
 	mu         sync.RWMutex
 	triples    map[string]Triple
 }
 
-func New() *store {
-	return &store{
+func NewSource() *source {
+	return &source{
 		triples:    make(map[string]Triple),
 		latestSnap: newGraph(0),
 	}
 }
 
-func (s *store) isUpdated() bool {
+func (s *source) isUpdated() bool {
 	return atomic.LoadUint32(&s.updated) > 0
 }
 
-func (s *store) update() {
+func (s *source) update() {
 	atomic.StoreUint32(&s.updated, uint32(1))
 }
 
-func (s *store) reset() {
+func (s *source) reset() {
 	atomic.StoreUint32(&s.updated, uint32(0))
 }
 
-func (s *store) Add(ts ...Triple) {
+func (s *source) Add(ts ...Triple) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	defer s.update()
@@ -96,7 +96,7 @@ func (s *store) Add(ts ...Triple) {
 		s.triples[tr.key()] = t
 	}
 }
-func (s *store) Remove(ts ...Triple) {
+func (s *source) Remove(ts ...Triple) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	defer s.update()
@@ -107,7 +107,7 @@ func (s *store) Remove(ts ...Triple) {
 	}
 }
 
-func (s *store) Snapshot() RDFGraph {
+func (s *source) Snapshot() RDFGraph {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 

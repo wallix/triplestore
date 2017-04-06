@@ -85,7 +85,7 @@ func TestEncodeDecodeOnFile(t *testing.T) {
 		t.Fatalf("got %d, want %d", got, want)
 	}
 
-	s := New()
+	s := NewSource()
 	s.Add(tris...)
 	snap := s.Snapshot()
 
@@ -130,7 +130,7 @@ func TestDecodeDataset(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	s := New()
+	s := NewSource()
 	s.Add(tris...)
 	snap := s.Snapshot()
 	if got, want := snap.Count(), 2; got != want {
