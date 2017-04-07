@@ -7,7 +7,10 @@ import (
 	"time"
 )
 
-const tagName = "predicate"
+const (
+	predTag = "predicate"
+	subTag  = "subject"
+)
 
 var random = rand.New(rand.NewSource(time.Now().UnixNano()))
 
@@ -35,7 +38,7 @@ func TriplesFromStruct(sub string, i interface{}) (out []Triple) {
 			continue
 		}
 
-		tag, embedded := field.Tag.Lookup("subject")
+		tag, embedded := field.Tag.Lookup(subTag)
 		fVal, ok := getStructOrPtrToStruct(fVal)
 		if ok && embedded {
 			sub := tag
@@ -47,15 +50,40 @@ func TriplesFromStruct(sub string, i interface{}) (out []Triple) {
 			continue
 		}
 
-		pred := field.Tag.Get(tagName)
-		objLit, err := ObjectLiteral(fVal.Interface())
-		if pred == "" || err != nil {
-			continue
+		pred := field.Tag.Get(predTag)
+
+		switch fVal.Kind() {
+		case reflect.Slice:
+			length := fVal.Len()
+			for i := 0; i < length; i++ {
+				sliceVal := fVal.Index(i)
+				if tri, ok := buildTripleFromVal(sub, pred, sliceVal); ok {
+					out = append(out, tri)
+				}
+			}
 		}
-		out = append(out, SubjPred(sub, pred).Object(objLit))
+
+		if tri, ok := buildTripleFromVal(sub, pred, fVal); ok {
+			out = append(out, tri)
+		}
 	}
 
 	return
+}
+
+func buildTripleFromVal(sub, pred string, v reflect.Value) (Triple, bool) {
+	if !v.CanInterface() {
+		return nil, false
+	}
+	if pred == "" {
+		return nil, false
+	}
+	objLit, err := ObjectLiteral(v.Interface())
+	if err != nil {
+		return nil, false
+	}
+
+	return SubjPred(sub, pred).Object(objLit), true
 }
 
 func getStructOrPtrToStruct(v reflect.Value) (reflect.Value, bool) {
