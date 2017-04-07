@@ -285,7 +285,7 @@ func (enc *ntriplesEncoder) buildIRI(id string) string {
 			for k, uri := range enc.c.Prefixes {
 				prefix := k + ":"
 				if strings.HasPrefix(id, prefix) {
-					id = uri + strings.TrimLeft(id, prefix)
+					id = uri + strings.TrimPrefix(id, prefix)
 					continue
 				}
 			}
