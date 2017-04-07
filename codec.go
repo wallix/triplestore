@@ -5,7 +5,9 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 )
@@ -270,7 +272,7 @@ func (enc *ntriplesEncoder) Encode(tris ...Triple) error {
 				namespace = lit.Type().NTriplesNamespaced()
 			}
 
-			buff.WriteString(fmt.Sprintf("\"%s\"%s", lit.Value(), namespace))
+			buff.WriteString(fmt.Sprintf("%s%s", strconv.QuoteToASCII(lit.Value()), namespace))
 		}
 		buff.WriteString(" .\n")
 	}
@@ -285,13 +287,13 @@ func (enc *ntriplesEncoder) buildIRI(id string) string {
 			for k, uri := range enc.c.Prefixes {
 				prefix := k + ":"
 				if strings.HasPrefix(id, prefix) {
-					id = uri + strings.TrimPrefix(id, prefix)
+					id = uri + url.QueryEscape(strings.TrimPrefix(id, prefix))
 					continue
 				}
 			}
 		}
 		if !strings.HasPrefix(id, "http") && enc.c.Base != "" {
-			id = enc.c.Base + id
+			id = enc.c.Base + url.QueryEscape(id)
 		}
 	}
 	return id

@@ -150,9 +150,11 @@ func TestEncodeNTriples(t *testing.T) {
 	triples := []Triple{
 		SubjPred("one", "rdf:type").Resource("onetype"),
 		SubjPred("one", "prop1").StringLiteral("two"),
-		SubjPred("one", "prop2").IntegerLiteral(284765293570),
+		SubjPred("http://my-url-to.test/#one", "prop2").IntegerLiteral(284765293570),
 		SubjPred("one", "prop3").BooleanLiteral(true),
 		SubjPred("one", "cloud:launched").DateTimeLiteral(time.Unix(1233456789, 0).UTC()),
+		SubjPred("co<mplex", "\"with>").StringLiteral("with\"special<chars."),
+		SubjPred("one", "with spaces").Resource("10 inbound-smtp.eu-west-1.amazonaws.com."),
 	}
 
 	var buff bytes.Buffer
@@ -167,9 +169,11 @@ func TestEncodeNTriples(t *testing.T) {
 
 	expect := `<http://test.url#one> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://test.url#onetype> .
 <http://test.url#one> <http://test.url#prop1> "two" .
-<http://test.url#one> <http://test.url#prop2> "284765293570"^^<http://www.w3.org/2001/XMLSchema#integer> .
+<http://my-url-to.test/#one> <http://test.url#prop2> "284765293570"^^<http://www.w3.org/2001/XMLSchema#integer> .
 <http://test.url#one> <http://test.url#prop3> "true"^^<http://www.w3.org/2001/XMLSchema#boolean> .
 <http://test.url#one> <http://awless.io/rdf/cloud#launched> "2009-02-01T02:53:09Z"^^<http://www.w3.org/2001/XMLSchema#dateTime> .
+<http://test.url#co%3Cmplex> <http://test.url#%22with%3E> "with\"special<chars." .
+<http://test.url#one> <http://test.url#with+spaces> <http://test.url#10+inbound-smtp.eu-west-1.amazonaws.com.> .
 `
 	if got, want := buff.String(), expect; got != want {
 		t.Fatalf("got \n%s\nwant \n%s\n", got, want)
