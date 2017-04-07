@@ -16,16 +16,48 @@ type TestStruct struct {
 	NoTag       string
 	Unsupported complex64 `predicate:"complex"`
 	Pointer     *string   `predicate:"ptr"`
+	unexported  string
 }
 
-func TestStructToTriple(t *testing.T) {
+type MainStruct struct {
+	Name string   `predicate:"name"`
+	Age  int      `predicate:"age"`
+	E    Embedded `subject:"rand"`
+}
+
+type Embedded struct {
+	Size int64 `predicate:"size"`
+	Male bool  `predicate:"male"`
+}
+
+func TestEmbeddedStructToTriple(t *testing.T) {
+	e := Embedded{Size: 186, Male: true}
+	s := MainStruct{Name: "donald", Age: 32, E: e}
+
+	tris := TriplesFromStruct("me", s)
+	src := NewSource()
+	src.Add(tris...)
+	snap := src.Snapshot()
+
+	if got, want := snap.Count(), 4; got != want {
+		t.Fatalf("got %d, want %d", got, want)
+	}
+
+	all := snap.WithPredObj("size", IntegerLiteral(186))
+	if got, want := len(all), 1; got != want {
+		t.Fatalf("got %d, want %d", got, want)
+	}
+	all = snap.WithPredObj("male", BooleanLiteral(true))
+	if got, want := len(all), 1; got != want {
+		t.Fatalf("got %d, want %d", got, want)
+	}
+}
+
+func TestSimpleStructToTriple(t *testing.T) {
 	now := time.Now()
 	s := TestStruct{
-		Name:  "donald",
-		Age:   32,
-		Size:  186,
-		Male:  true,
-		Birth: now,
+		Name: "donald", Age: 32, Size: 186,
+		Male: true, Birth: now,
 	}
 
 	exp := []Triple{

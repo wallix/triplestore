@@ -1,8 +1,15 @@
 package triplestore
 
-import "reflect"
+import (
+	"fmt"
+	"math/rand"
+	"reflect"
+	"time"
+)
 
 const tagName = "predicate"
+
+var random = rand.New(rand.NewSource(time.Now().UnixNano()))
 
 // Convert a Struct or ptr to Struct into triples
 // using field tags.
@@ -14,23 +21,34 @@ const tagName = "predicate"
 func TriplesFromStruct(sub string, i interface{}) (out []Triple) {
 	val := reflect.ValueOf(i)
 
-	switch val.Kind() {
-	case reflect.Struct:
-		reflect.ValueOf(i)
-	case reflect.Ptr:
-		val = val.Elem()
-		if val.Kind() != reflect.Struct {
-			return
-		}
-	default:
+	var ok bool
+	val, ok = getStructOrPtrToStruct(val)
+	if !ok {
 		return
 	}
 
 	st := val.Type()
 
 	for i := 0; i < st.NumField(); i++ {
-		pred := st.Field(i).Tag.Get(tagName)
-		objLit, err := ObjectLiteral(val.Field(i).Interface())
+		field, fVal := st.Field(i), val.Field(i)
+		if !fVal.CanInterface() {
+			continue
+		}
+
+		tag, embedded := field.Tag.Lookup("subject")
+		fVal, ok := getStructOrPtrToStruct(fVal)
+		if ok && embedded {
+			sub := tag
+			if tag == "rand" {
+				sub = fmt.Sprintf("%x", random.Uint32())
+			}
+			tris := TriplesFromStruct(sub, fVal.Interface())
+			out = append(out, tris...)
+			continue
+		}
+
+		pred := field.Tag.Get(tagName)
+		objLit, err := ObjectLiteral(fVal.Interface())
 		if pred == "" || err != nil {
 			continue
 		}
@@ -38,4 +56,17 @@ func TriplesFromStruct(sub string, i interface{}) (out []Triple) {
 	}
 
 	return
+}
+
+func getStructOrPtrToStruct(v reflect.Value) (reflect.Value, bool) {
+	switch v.Kind() {
+	case reflect.Struct:
+		return v, true
+	case reflect.Ptr:
+		if v.Elem().Kind() == reflect.Struct {
+			return v.Elem(), true
+		}
+	}
+
+	return v, false
 }
