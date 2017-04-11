@@ -47,6 +47,7 @@ func TestBuildObjectFromInterface(t *testing.T) {
 	obj, _ = ObjectLiteral(5)
 	if got, want := obj, IntegerLiteral(5); got != want {
 		t.Fatalf("got %v, want %v", got, want)
+
 	}
 	obj, _ = ObjectLiteral(int64(5))
 	if got, want := obj, IntegerLiteral(5); got != want {
@@ -64,6 +65,59 @@ func TestBuildObjectFromInterface(t *testing.T) {
 	obj, _ = ObjectLiteral(&now)
 	if got, want := obj, DateTimeLiteral(now); got != want {
 		t.Fatalf("got %v, want %v", got, want)
+	}
+}
+
+func TestBuildAndParseObjectLiteralFromDifferentTypes(t *testing.T) {
+	tcases := []struct {
+		in  interface{}
+		out Object
+		exp interface{}
+	}{
+		{float64(2.0), Float64Literal(2.0), float64(2.0)},
+		{float32(2.0), Float32Literal(2.0), float32(2.0)},
+
+		{int8(-2), Int8Literal(-2), int8(-2)},
+		{int16(-2), Int16Literal(-2), int16(-2)},
+		{int32(-2), IntegerLiteral(-2), int(-2)},
+		{int64(-2), IntegerLiteral(-2), int(-2)},
+		{int(-2), IntegerLiteral(-2), int(-2)},
+
+		{uint8(2), Uint8Literal(2), uint8(2)},
+		{uint16(2), Uint16Literal(2), uint16(2)},
+		{uint32(2), UintegerLiteral(2), uint(2)},
+		{uint64(2), UintegerLiteral(2), uint(2)},
+		{uint(2), UintegerLiteral(2), uint(2)},
+	}
+
+	for _, tcase := range tcases {
+		obj, err := ObjectLiteral(tcase.in)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got, want := obj, tcase.out; !got.Equal(want) {
+			t.Fatalf("got %v, want %v", got, want)
+		}
+
+		lit, err := ParseLiteral(tcase.out)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got, want := lit, tcase.exp; got != want {
+			t.Fatalf("got %v (%T), want %v (%T)", got, got, want, want)
+		}
+	}
+}
+
+func TestUnsupportedLiteralTypesErr(t *testing.T) {
+	type any struct{}
+
+	_, err := ObjectLiteral(&any{})
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if _, ok := err.(UnsupportedLiteralTypeError); !ok {
+		t.Fatal("expected error of known type")
 	}
 }
 

@@ -3,6 +3,7 @@ package triplestore
 import (
 	"errors"
 	"fmt"
+	"reflect"
 	"strconv"
 	"time"
 )
@@ -55,6 +56,14 @@ func (b *tripleBuilder) Object(o Object) *triple {
 	}
 }
 
+type UnsupportedLiteralTypeError struct {
+	i interface{}
+}
+
+func (e UnsupportedLiteralTypeError) Error() string {
+	return fmt.Sprintf("unsupported literal type %T", e.i)
+}
+
 func ObjectLiteral(i interface{}) (Object, error) {
 	switch ii := i.(type) {
 	case string:
@@ -63,14 +72,32 @@ func ObjectLiteral(i interface{}) (Object, error) {
 		return BooleanLiteral(ii), nil
 	case int:
 		return IntegerLiteral(ii), nil
-	case int64:
-		return IntegerLiteral(int(ii)), nil
+	case int64, int32:
+		r := reflect.ValueOf(ii)
+		return IntegerLiteral(int(r.Int())), nil
+	case int16:
+		return Int16Literal(ii), nil
+	case int8:
+		return Int8Literal(ii), nil
+	case float32:
+		return Float32Literal(ii), nil
+	case float64:
+		return Float64Literal(ii), nil
+	case uint:
+		return UintegerLiteral(uint(ii)), nil
+	case uint64, uint32:
+		r := reflect.ValueOf(ii)
+		return UintegerLiteral(uint(r.Uint())), nil
+	case uint16:
+		return Uint16Literal(ii), nil
+	case uint8:
+		return Uint8Literal(ii), nil
 	case time.Time:
 		return DateTimeLiteral(ii), nil
 	case *time.Time:
 		return DateTimeLiteral(*ii), nil
 	default:
-		return nil, fmt.Errorf("unsupported literal type %T", i)
+		return nil, UnsupportedLiteralTypeError{i}
 	}
 }
 
@@ -83,6 +110,20 @@ func ParseLiteral(obj Object) (interface{}, error) {
 			return ParseDateTime(obj)
 		case XsdInteger:
 			return ParseInteger(obj)
+		case XsdByte:
+			return ParseInt8(obj)
+		case XsdShort:
+			return ParseInt16(obj)
+		case XsdUinteger:
+			return ParseUinteger(obj)
+		case XsdUnsignedByte:
+			return ParseUint8(obj)
+		case XsdUnsignedShort:
+			return ParseUint16(obj)
+		case XsdDouble:
+			return ParseFloat64(obj)
+		case XsdFloat:
+			return ParseFloat32(obj)
 		case XsdString:
 			return ParseString(obj)
 		default:
@@ -110,13 +151,13 @@ func (b *tripleBuilder) BooleanLiteral(bl bool) *triple {
 func ParseBoolean(obj Object) (bool, error) {
 	if lit, ok := obj.Literal(); ok {
 		if lit.Type() != XsdBoolean {
-			return false, fmt.Errorf("literal is not an boolean but %s", lit.Type())
+			return false, fmt.Errorf("literal is not an %s but %s", XsdBoolean, lit.Type())
 		}
 
 		return strconv.ParseBool(lit.Value())
 	}
 
-	return false, errors.New("cannot parse boolean: object is not literal")
+	return false, fmt.Errorf("cannot parse %s: object is not literal", XsdBoolean)
 }
 
 func IntegerLiteral(i int) Object {
@@ -137,15 +178,227 @@ func (b *tripleBuilder) IntegerLiteral(i int) *triple {
 func ParseInteger(obj Object) (int, error) {
 	if lit, ok := obj.Literal(); ok {
 		if lit.Type() != XsdInteger {
-			return 0, fmt.Errorf("literal is not an integer but %s", lit.Type())
+			return 0, fmt.Errorf("literal is not an %s but %s", XsdInteger, lit.Type())
 		}
 
 		return strconv.Atoi(lit.Value())
 	}
 
-	return 0, errors.New("cannot parse integer: object is not literal")
+	return 0, fmt.Errorf("cannot parse %s: object is not literal", XsdInteger)
 }
 
+func Int8Literal(i int8) Object {
+	return object{
+		isLit: true,
+		lit:   literal{typ: XsdByte, val: fmt.Sprint(i)},
+	}
+}
+
+func (b *tripleBuilder) Int8Literal(i int8) *triple {
+	return &triple{
+		sub:  subject(b.sub),
+		pred: predicate(b.pred),
+		obj:  Int8Literal(i).(object),
+	}
+}
+
+func ParseInt8(obj Object) (int8, error) {
+	if lit, ok := obj.Literal(); ok {
+		if lit.Type() != XsdByte {
+			return 0, fmt.Errorf("literal is not an %s but %s", XsdByte, lit.Type())
+		}
+
+		num, err := strconv.ParseInt(lit.Value(), 10, 8)
+		if err != nil {
+			return 0, err
+		}
+		return int8(num), nil
+	}
+
+	return 0, fmt.Errorf("cannot parse %s: object is not literal", XsdByte)
+}
+
+func Int16Literal(i int16) Object {
+	return object{
+		isLit: true,
+		lit:   literal{typ: XsdShort, val: fmt.Sprint(i)},
+	}
+}
+
+func (b *tripleBuilder) Int16Literal(i int16) *triple {
+	return &triple{
+		sub:  subject(b.sub),
+		pred: predicate(b.pred),
+		obj:  Int16Literal(i).(object),
+	}
+}
+
+func ParseInt16(obj Object) (int16, error) {
+	if lit, ok := obj.Literal(); ok {
+		if lit.Type() != XsdShort {
+			return 0, fmt.Errorf("literal is not an %s but %s", XsdShort, lit.Type())
+		}
+
+		num, err := strconv.ParseInt(lit.Value(), 10, 16)
+		if err != nil {
+			return 0, err
+		}
+		return int16(num), nil
+	}
+
+	return 0, fmt.Errorf("cannot parse %s: object is not literal", XsdShort)
+}
+
+func UintegerLiteral(i uint) Object {
+	return object{
+		isLit: true,
+		lit:   literal{typ: XsdUinteger, val: fmt.Sprint(i)},
+	}
+}
+
+func (b *tripleBuilder) UintegerLiteral(i uint) *triple {
+	return &triple{
+		sub:  subject(b.sub),
+		pred: predicate(b.pred),
+		obj:  UintegerLiteral(i).(object),
+	}
+}
+
+func ParseUinteger(obj Object) (uint, error) {
+	if lit, ok := obj.Literal(); ok {
+		if lit.Type() != XsdUinteger {
+			return 0, fmt.Errorf("literal is not an %s but %s", XsdUinteger, lit.Type())
+		}
+
+		num, err := strconv.ParseUint(lit.Value(), 10, 64)
+		if err != nil {
+			return 0, err
+		}
+		return uint(num), nil
+	}
+
+	return 0, fmt.Errorf("cannot parse %s: object is not literal", XsdUinteger)
+}
+
+func Uint8Literal(i uint8) Object {
+	return object{
+		isLit: true,
+		lit:   literal{typ: XsdUnsignedByte, val: fmt.Sprint(i)},
+	}
+}
+
+func (b *tripleBuilder) Uint8(i uint8) *triple {
+	return &triple{
+		sub:  subject(b.sub),
+		pred: predicate(b.pred),
+		obj:  Uint8Literal(i).(object),
+	}
+}
+
+func ParseUint8(obj Object) (uint8, error) {
+	if lit, ok := obj.Literal(); ok {
+		if lit.Type() != XsdUnsignedByte {
+			return 0, fmt.Errorf("literal is not an %s but %s", XsdUnsignedByte, lit.Type())
+		}
+
+		num, err := strconv.ParseUint(lit.Value(), 10, 8)
+		if err != nil {
+			return 0, err
+		}
+		return uint8(num), nil
+	}
+
+	return 0, fmt.Errorf("cannot parse %s: object is not literal", XsdUnsignedByte)
+}
+
+func Uint16Literal(i uint16) Object {
+	return object{
+		isLit: true,
+		lit:   literal{typ: XsdUnsignedShort, val: fmt.Sprint(i)},
+	}
+}
+
+func (b *tripleBuilder) Uint16(i uint16) *triple {
+	return &triple{
+		sub:  subject(b.sub),
+		pred: predicate(b.pred),
+		obj:  Uint16Literal(i).(object),
+	}
+}
+
+func ParseUint16(obj Object) (uint16, error) {
+	if lit, ok := obj.Literal(); ok {
+		if lit.Type() != XsdUnsignedShort {
+			return 0, fmt.Errorf("literal is not an %s but %s", XsdUnsignedShort, lit.Type())
+		}
+
+		num, err := strconv.ParseUint(lit.Value(), 10, 16)
+		if err != nil {
+			return 0, err
+		}
+		return uint16(num), nil
+	}
+
+	return 0, fmt.Errorf("cannot parse %s: object is not literal", XsdUnsignedShort)
+}
+
+func Float64Literal(i float64) Object {
+	return object{
+		isLit: true,
+		lit:   literal{typ: XsdDouble, val: fmt.Sprint(i)},
+	}
+}
+
+func (b *tripleBuilder) Float64Literal(i float64) *triple {
+	return &triple{
+		sub:  subject(b.sub),
+		pred: predicate(b.pred),
+		obj:  Float64Literal(i).(object),
+	}
+}
+
+func ParseFloat64(obj Object) (float64, error) {
+	if lit, ok := obj.Literal(); ok {
+		if lit.Type() != XsdDouble {
+			return 0, fmt.Errorf("literal is not an %s but %s", XsdDouble, lit.Type())
+		}
+
+		return strconv.ParseFloat(lit.Value(), 64)
+	}
+
+	return 0, fmt.Errorf("cannot parse %s: object is not literal", XsdDouble)
+}
+
+func Float32Literal(i float32) Object {
+	return object{
+		isLit: true,
+		lit:   literal{typ: XsdFloat, val: fmt.Sprint(i)},
+	}
+}
+
+func (b *tripleBuilder) Float32Literal(i float32) *triple {
+	return &triple{
+		sub:  subject(b.sub),
+		pred: predicate(b.pred),
+		obj:  Float32Literal(i).(object),
+	}
+}
+
+func ParseFloat32(obj Object) (float32, error) {
+	if lit, ok := obj.Literal(); ok {
+		if lit.Type() != XsdFloat {
+			return 0, fmt.Errorf("literal is not an %s but %s", XsdFloat, lit.Type())
+		}
+
+		conv, err := strconv.ParseFloat(lit.Value(), 32)
+		if err != nil {
+			return 0, err
+		}
+		return float32(conv), nil
+	}
+
+	return 0, fmt.Errorf("cannot parse %s: object is not literal", XsdFloat)
+}
 func StringLiteral(s string) Object {
 	return object{
 		isLit: true,
@@ -164,13 +417,13 @@ func (b *tripleBuilder) StringLiteral(s string) *triple {
 func ParseString(obj Object) (string, error) {
 	if lit, ok := obj.Literal(); ok {
 		if lit.Type() != XsdString {
-			return "", fmt.Errorf("literal is not a string but %s", lit.Type())
+			return "", fmt.Errorf("literal is not a %s but %s", XsdString, lit.Type())
 		}
 
 		return lit.Value(), nil
 	}
 
-	return "", errors.New("cannot parse string: object is not literal")
+	return "", fmt.Errorf("cannot parse %s: object is not literal", XsdString)
 }
 
 func DateTimeLiteral(tm time.Time) Object {
@@ -197,7 +450,7 @@ func ParseDateTime(obj Object) (time.Time, error) {
 	var t time.Time
 	if lit, ok := obj.Literal(); ok {
 		if lit.Type() != XsdDateTime {
-			return t, fmt.Errorf("literal is not an dateTime but %s", lit.Type())
+			return t, fmt.Errorf("literal is not an %s but %s", XsdDateTime, lit.Type())
 		}
 
 		err := t.UnmarshalText([]byte(lit.Value()))
@@ -207,5 +460,5 @@ func ParseDateTime(obj Object) (time.Time, error) {
 		return t, nil
 	}
 
-	return t, errors.New("cannot parse dateTime: object is not literal")
+	return t, fmt.Errorf("cannot parse %s: object is not literal", XsdDateTime)
 }
