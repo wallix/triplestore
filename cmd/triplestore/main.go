@@ -11,12 +11,13 @@ import (
 	tstore "github.com/wallix/triplestore"
 )
 
-var filesFlag arrayFlags
-var outFormatFlag string
-
-var useRdfPrefixesFlag bool
-var prefixesFlag arrayFlags
-var baseFlag string
+var (
+	outFormatFlag      string
+	baseFlag           string
+	filesFlag          arrayFlags
+	prefixesFlag       arrayFlags
+	useRdfPrefixesFlag bool
+)
 
 func init() {
 	flag.StringVar(&outFormatFlag, "out-format", "ntriples", "output format (ntriples, bin)")
@@ -35,8 +36,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	err = convert(filesFlag, outFormatFlag, context)
-	if err != nil {
+	if err := convert(filesFlag, outFormatFlag, context); err != nil {
 		log.Fatal(err)
 	}
 }
@@ -83,8 +83,8 @@ func convert(inFilePaths []string, outFormatFlag string, context *tstore.Context
 	default:
 		return fmt.Errorf("unknown format %s, expected either 'ntriples' or 'bin'", outFormatFlag)
 	}
-	err = encoder.Encode(triples...)
-	if err != nil {
+
+	if err := encoder.Encode(triples...); err != nil {
 		return err
 	}
 
