@@ -5,6 +5,26 @@ import (
 	"time"
 )
 
+func SubjPredRes(s, p, r string) *triple {
+	return &triple{
+		sub:  subject(s),
+		pred: predicate(p),
+		obj:  Resource(r).(object),
+	}
+}
+
+func SubjPredLit(s, p string, l interface{}) (*triple, error) {
+	o, err := ObjectLiteral(l)
+	if err != nil {
+		return nil, err
+	}
+	return &triple{
+		sub:  subject(s),
+		pred: predicate(p),
+		obj:  o.(object),
+	}, nil
+}
+
 type tripleBuilder struct {
 	sub, pred string
 }
@@ -15,7 +35,6 @@ func SubjPred(s, p string) *tripleBuilder {
 
 func Resource(s string) Object {
 	return object{resourceID: s}
-
 }
 
 func (b *tripleBuilder) Resource(s string) *triple {

@@ -7,15 +7,36 @@ import (
 
 func TestBuildTriple(t *testing.T) {
 	tri := SubjPred("subject", "predicate").StringLiteral("any")
-
 	if got, want := tri.Subject(), "subject"; got != want {
 		t.Fatalf("got %s, want %s", got, want)
 	}
-
 	if got, want := tri.Predicate(), "predicate"; got != want {
 		t.Fatalf("got %s, want %s", got, want)
 	}
 
+	tri = SubjPredRes("subject", "predicate", "resource")
+	if got, want := tri.Subject(), "subject"; got != want {
+		t.Fatalf("got %s, want %s", got, want)
+	}
+	if got, want := tri.Predicate(), "predicate"; got != want {
+		t.Fatalf("got %s, want %s", got, want)
+	}
+	res, _ := tri.Object().ResourceID()
+	if got, want := res, "resource"; got != want {
+		t.Fatalf("got %s, want %s", got, want)
+	}
+
+	tri, _ = SubjPredLit("subject", "predicate", 3)
+	if got, want := tri.Subject(), "subject"; got != want {
+		t.Fatalf("got %s, want %s", got, want)
+	}
+	if got, want := tri.Predicate(), "predicate"; got != want {
+		t.Fatalf("got %s, want %s", got, want)
+	}
+	lit, _ := ParseInteger(tri.Object())
+	if got, want := lit, 3; got != want {
+		t.Fatalf("got %d, want %d", got, want)
+	}
 }
 
 func TestBuildObjectFromInterface(t *testing.T) {
