@@ -72,7 +72,9 @@ And
 
 ## Usage
 
-#### Manage triples
+#### Create triples
+
+Although you can build triples the way you want to model any data, they are usually built from known RDF vocabularies & namespace. Ex: [foaf](http://xmlns.com/foaf/spec/), ...
 
 ```go
 triples = append(triples,
@@ -96,9 +98,43 @@ triples = append(triples,
 )
 ```
 
-Although you can build triples the way you want to model any data, they are usually built from known RDF vocabularies & namespace. Ex: [foaf](http://xmlns.com/foaf/spec/), ...
+#### Create triples from a struct
 
-Triples can be equal:
+As a convenience you can create triples from a singular struct:
+
+```go
+type Address struct {
+	Street string `predicate:"street"`
+}
+
+type Person struct {
+	Name     string    `predicate:"name"`
+	Age      int       `predicate:"age"`
+	Size     int64     `predicate:"size"`
+	Male     bool      `predicate:"male"`
+	Birth    time.Time `predicate:"birth"`
+	Surnames []string  `predicate:"surnames"`
+	Addr     Address   `subject:"address"`
+}
+
+addr := &Address{...}
+person := &Person{Addr: addr, ....}
+
+tris := TriplesFromStruct("jsmith", person)
+
+src := NewSource()
+src.Add(tris)
+snap := src.Snapshot()
+
+snap.Contains(SubjPredLit("jsmith", "name", "..."))
+snap.Contains(SubjPredLit("jsmith", "size", 186))
+snap.Contains(SubjPredLit("jsmith", "surnames", "..."))
+snap.Contains(SubjPredLit("jsmith", "surnames", "..."))
+snap.Contains(SubjPredLit("address", "street", "..."))
+
+```
+
+#### Equality
 
 ```go
 	me := SubjPred("me", "name").StringLiteral("jsmith")
