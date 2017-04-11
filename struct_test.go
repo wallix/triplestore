@@ -26,7 +26,7 @@ type TestStruct struct {
 type MainStruct struct {
 	Name string   `predicate:"name"`
 	Age  int      `predicate:"age"`
-	E    Embedded `subject:"rand"`
+	E    Embedded `predicate:"embedded" subject:"rand"`
 }
 
 type Embedded struct {
@@ -43,11 +43,15 @@ func TestEmbeddedStructToTriple(t *testing.T) {
 	src.Add(tris...)
 	snap := src.Snapshot()
 
-	if got, want := snap.Count(), 4; got != want {
+	if got, want := snap.Count(), 5; got != want {
 		t.Fatalf("got %d, want %d", got, want)
 	}
 
-	all := snap.WithPredObj("size", IntegerLiteral(186))
+	all := snap.WithSubjPred("me", "embedded")
+	if got, want := len(all), 1; got != want {
+		t.Fatalf("got %d, want %d", got, want)
+	}
+	all = snap.WithPredObj("size", IntegerLiteral(186))
 	if got, want := len(all), 1; got != want {
 		t.Fatalf("got %d, want %d", got, want)
 	}
