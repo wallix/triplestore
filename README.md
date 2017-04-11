@@ -15,6 +15,7 @@ Here the RDF triples implementation follows along the [W3C RDF concepts](https:/
 - Snapshot and query RDFGraphs
 - Encode triples to binary, NTriples format
 - Decode triples from binary
+- CLI (Command line interface) utility to read and convert triples files.
 
 Roadmap
 - RDF graph comparison
@@ -23,7 +24,7 @@ Roadmap
 
 ## Library 
 
-This library is written using the [Golang](https://golang.org) language.
+This library is written using the [Golang](https://golang.org) language. You need to [install Golang](https://golang.org/doc/install) before using it.
 
 Get it:
 
@@ -45,6 +46,13 @@ import (
 	// tstore "github.com/wallix/triplestore" for less verbosity
 )
 ```
+
+Get the CLI with:
+
+```
+`go get -u github.com/wallix/triplestore/cmd/triplestore`
+```
+
 ## Concepts
 
 A triple is made of 3 components:
