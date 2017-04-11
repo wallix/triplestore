@@ -1,5 +1,6 @@
 [![Build Status](https://api.travis-ci.org/wallix/triplestore.svg?branch=master)](https://travis-ci.org/wallix/triplestore)
 [![Go Report Card](https://goreportcard.com/badge/github.com/wallix/triplestore)](https://goreportcard.com/report/github.com/wallix/triplestore)
+[![GoDoc](https://godoc.org/github.com/wallix/triplestore?status.svg)](https://godoc.org/github.com/wallix/triplestore) 
 
 # Triple Store
 
@@ -50,7 +51,7 @@ import (
 Get the CLI with:
 
 ```
-`go get -u github.com/wallix/triplestore/cmd/triplestore`
+go get -u github.com/wallix/triplestore/cmd/triplestore
 ```
 
 ## Concepts
@@ -77,6 +78,8 @@ And
 - A **source** is a persistent yet mutable source or container of triples.
 - A **RDFGraph** is an **immutable set of triples**. It is a snapshot of a source and queryable .
 - A **dataset** is a basically a collection of *RDFGraph*.
+
+You can also view the library through the [godoc](https://godoc.org/github.com/wallix/triplestore)
 
 ## Usage
 
