@@ -34,7 +34,7 @@ func SubjPred(s, p string) *tripleBuilder {
 }
 
 func Resource(s string) Object {
-	return object{resourceID: s}
+	return object{resource: s}
 }
 
 func (b *tripleBuilder) Resource(s string) *triple {

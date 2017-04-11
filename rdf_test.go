@@ -21,7 +21,7 @@ func TestBuildTriple(t *testing.T) {
 	if got, want := tri.Predicate(), "predicate"; got != want {
 		t.Fatalf("got %s, want %s", got, want)
 	}
-	res, _ := tri.Object().ResourceID()
+	res, _ := tri.Object().Resource()
 	if got, want := res, "resource"; got != want {
 		t.Fatalf("got %s, want %s", got, want)
 	}
@@ -149,16 +149,16 @@ func TestParseObject(t *testing.T) {
 		t.Fatalf("got %s, want %s", got, want)
 	}
 
-	_, ok = tri.Object().ResourceID()
+	_, ok = tri.Object().Resource()
 	if got, want := ok, false; got != want {
 		t.Fatalf("got %t, want %t", got, want)
 	}
 }
 
-func TestParseResourceID(t *testing.T) {
+func TestParseResource(t *testing.T) {
 	tri := SubjPred("subject", "predicate").Resource("dbpedia:Bonobo")
 
-	rid, ok := tri.Object().ResourceID()
+	rid, ok := tri.Object().Resource()
 	if got, want := ok, true; got != want {
 		t.Fatalf("got %t, want %t", got, want)
 	}
