@@ -68,12 +68,23 @@ func TestBuildObjectFromInterface(t *testing.T) {
 	}
 }
 
+type stringer struct {
+	s string
+}
+
+func (s stringer) String() string {
+	return s.s
+}
+
 func TestBuildAndParseObjectLiteralFromDifferentTypes(t *testing.T) {
+
 	tcases := []struct {
 		in  interface{}
 		out Object
 		exp interface{}
 	}{
+		{stringer{"stuff"}, StringLiteral("stuff"), "stuff"},
+
 		{float64(2.0), Float64Literal(2.0), float64(2.0)},
 		{float32(2.0), Float32Literal(2.0), float32(2.0)},
 
