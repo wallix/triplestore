@@ -179,3 +179,36 @@ func TestEncodeNTriples(t *testing.T) {
 		t.Fatalf("got \n%s\nwant \n%s\n", got, want)
 	}
 }
+
+func TestEncodeDotGraph(t *testing.T) {
+	tris := []Triple{
+		SubjPredRes("me", "rel", "you"),
+		SubjPredRes("me", "rdf:type", "person"),
+		SubjPredRes("you", "rel", "other"),
+		SubjPredRes("you", "rdf:type", "child"),
+		SubjPredRes("other", "any", "john"),
+	}
+
+	var buff bytes.Buffer
+	if err := NewDotGraphEncoder(&buff, "rel").Encode(tris...); err != nil {
+		t.Fatal(err)
+	}
+
+	exp := strings.Split(`digraph "rel" {
+"me" -> "you";
+"me" [label="me<person>"];
+"you" -> "other";
+"you" [label="you<child>"];
+}`, "\n")
+
+	result := buff.String()
+	if splits := strings.Split(result, "\n"); len(splits) != 6 {
+		t.Fatalf("expected 6 lines count in \n%s\n", result)
+	}
+
+	for _, line := range exp {
+		if got, want := buff.String(), line; !strings.Contains(got, want) {
+			t.Fatalf("\n%q\n should contain \n%q\n", got, want)
+		}
+	}
+}

@@ -14,6 +14,7 @@ import (
 var (
 	outFormatFlag      string
 	baseFlag           string
+	dotPredicateFlag   string
 	filesFlag          arrayFlags
 	prefixesFlag       arrayFlags
 	useRdfPrefixesFlag bool
@@ -25,6 +26,7 @@ func init() {
 	flag.BoolVar(&useRdfPrefixesFlag, "rdf-prefixes", false, "use default RDF prefixes (rdf, rdfs, xsd)")
 	flag.Var(&prefixesFlag, "prefix", "RDF custom prefixes (format: \"prefix:http://my.uri\"")
 	flag.StringVar(&baseFlag, "base", "", "RDF custom base prefix")
+	flag.StringVar(&dotPredicateFlag, "predicate", "", "Predicate on which to build a dot graph file")
 }
 
 func main() {
@@ -80,8 +82,14 @@ func convert(inFilePaths []string, outFormatFlag string, context *tstore.Context
 		encoder = tstore.NewNTriplesEncoderWithContext(os.Stdout, context)
 	case "bin":
 		encoder = tstore.NewBinaryEncoder(os.Stdout)
+	case "dot":
+		if dotPredicateFlag == "" {
+			return fmt.Errorf("missing -predicate param to output to dot format")
+		}
+
+		encoder = tstore.NewDotGraphEncoder(os.Stdout, dotPredicateFlag)
 	default:
-		return fmt.Errorf("unknown format %s, expected either 'ntriples' or 'bin'", outFormatFlag)
+		return fmt.Errorf("unknown format %s, expected either 'ntriples', 'dot' or 'bin'", outFormatFlag)
 	}
 
 	if err := encoder.Encode(triples...); err != nil {
