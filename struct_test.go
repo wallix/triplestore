@@ -1,6 +1,7 @@
 package triplestore
 
 import (
+	"net"
 	"testing"
 	"time"
 )
@@ -97,14 +98,37 @@ func TestSimpleStructToTriple(t *testing.T) {
 
 func TestReturnEmptyTriplesOnNonStructElem(t *testing.T) {
 	var ptr *string
+	var strPtr *stringer
+	var ipnet *net.IPNet
 	tcases := []struct {
-		val interface{}
+		Val interface{} `predicate:"anything"`
 	}{
-		{true}, {"any"}, {ptr},
+		{true}, {"any"}, {ptr}, {strPtr}, {ipnet},
 	}
 
 	for i, tc := range tcases {
-		tris := TriplesFromStruct("", tc.val)
+		tris := TriplesFromStruct("", tc.Val)
+		if len(tris) != 0 {
+			t.Fatalf("case %d: expected no triples", i+1)
+		}
+	}
+}
+
+func TestReturnEmptyTriplesOnVoidPointers(t *testing.T) {
+	type anyStruct struct {
+		Val interface{} `predicate:"anything"`
+	}
+	var ptr *string
+	var strPtr *stringer
+	var ipnet *net.IPNet
+	tcases := []struct {
+		st anyStruct
+	}{
+		{anyStruct{ptr}}, {anyStruct{strPtr}}, {anyStruct{ipnet}},
+	}
+
+	for i, tc := range tcases {
+		tris := TriplesFromStruct("", tc.st)
 		if len(tris) != 0 {
 			t.Fatalf("case %d: expected no triples", i+1)
 		}
