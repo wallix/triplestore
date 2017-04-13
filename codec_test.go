@@ -193,8 +193,7 @@ func TestEncodeNTriples(t *testing.T) {
 <http://test.url#one> <http://test.url#prop3> "true"^^<http://www.w3.org/2001/XMLSchema#boolean> .
 <http://test.url#one> <http://awless.io/rdf/cloud#launched> "2009-02-01T02:53:09Z"^^<http://www.w3.org/2001/XMLSchema#dateTime> .
 <http://test.url#co%3Cmplex> <http://test.url#%22with%3E> "with\"special<chars." .
-<http://test.url#one> <http://test.url#with+spaces> <http://test.url#10+inbound-smtp.eu-west-1.amazonaws.com.> .
-`
+<http://test.url#one> <http://test.url#with+spaces> <http://test.url#10+inbound-smtp.eu-west-1.amazonaws.com.> .`
 	if got, want := buff.String(), expect; got != want {
 		t.Fatalf("got \n%s\nwant \n%s\n", got, want)
 	}

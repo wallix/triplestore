@@ -107,12 +107,13 @@ func NewNTriplesEncoderWithContext(w io.Writer, c *Context) Encoder {
 
 func (enc *ntriplesEncoder) Encode(tris ...Triple) error {
 	var buff bytes.Buffer
-	for _, t := range tris {
+
+	for i, t := range tris {
 		buff.WriteString(fmt.Sprintf("<%s> <%s> ", enc.buildIRI(t.Subject()), enc.buildIRI(t.Predicate())))
+
 		if rid, ok := t.Object().Resource(); ok {
 			buff.WriteString(fmt.Sprintf("<%s>", enc.buildIRI(rid)))
-		}
-		if lit, ok := t.Object().Literal(); ok {
+		} else if lit, ok := t.Object().Literal(); ok {
 			var namespace string
 			switch lit.Type() {
 			case XsdString:
@@ -123,7 +124,11 @@ func (enc *ntriplesEncoder) Encode(tris ...Triple) error {
 
 			buff.WriteString(fmt.Sprintf("%s%s", strconv.QuoteToASCII(lit.Value()), namespace))
 		}
-		buff.WriteString(" .\n")
+
+		buff.Write([]byte(" ."))
+		if i != len(tris)-1 {
+			buff.Write([]byte("\n"))
+		}
 	}
 
 	_, err := enc.w.Write(buff.Bytes())
