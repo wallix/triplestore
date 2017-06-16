@@ -113,13 +113,13 @@ func TestSource(t *testing.T) {
 
 func TestStoreConcurrentAccess(t *testing.T) {
 	s := tstore.NewSource()
-	any := tstore.SubjPred("", "").StringLiteral("")
+	any := tstore.SubjPred("any", "any").StringLiteral("any")
 
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		for i := 0; i < 10; i++ {
+		for i := 0; i < 50; i++ {
 			s.Add(any)
 		}
 	}()
@@ -127,8 +127,17 @@ func TestStoreConcurrentAccess(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		for i := 0; i < 10; i++ {
+		for i := 0; i < 50; i++ {
 			s.Add(any)
+			s.Snapshot()
+		}
+	}()
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for i := 0; i < 50; i++ {
+			s.Snapshot()
 		}
 	}()
 
