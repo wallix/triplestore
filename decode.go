@@ -21,6 +21,12 @@ func NewBinaryDecoder(r io.Reader) Decoder {
 	return &binaryDecoder{r: r}
 }
 
+func IsBinaryFormat(r io.Reader) bool {
+	dec := &binaryDecoder{r: r}
+	_, err := dec.readWord()
+	return err == nil
+}
+
 func (dec *binaryDecoder) Decode() ([]Triple, error) {
 	for {
 		done, err := dec.decodeTriple()
