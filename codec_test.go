@@ -17,15 +17,15 @@ func TestDetectBinaryFormat(t *testing.T) {
 	}
 
 	var buff bytes.Buffer
-    NewBinaryEncoder(&buff).Encode(triples...)
+	NewBinaryEncoder(&buff).Encode(triples...)
 
-	if got, want := IsBinaryFormat(&buff), true; got != want {
+	if got, want := IsBinaryFormat(buff.Bytes()), true; got != want {
 		t.Fatalf("got %t, want %t", got, want)
 	}
 
 	buff.Reset()
 	NewNTriplesEncoder(&buff).Encode(triples...)
-	if got, want := IsBinaryFormat(&buff), false; got != want {
+	if got, want := IsBinaryFormat(buff.Bytes()), false; got != want {
 		t.Fatalf("got %t, want %t", got, want)
 	}
 }

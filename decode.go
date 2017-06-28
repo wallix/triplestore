@@ -1,6 +1,7 @@
 package triplestore
 
 import (
+	"bytes"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -21,8 +22,8 @@ func NewBinaryDecoder(r io.Reader) Decoder {
 	return &binaryDecoder{r: r}
 }
 
-func IsBinaryFormat(r io.Reader) bool {
-	dec := &binaryDecoder{r: r}
+func IsBinaryFormat(data []byte) bool {
+	dec := &binaryDecoder{r: bytes.NewReader(data)}
 	_, err := dec.readWord()
 	return err == nil
 }
