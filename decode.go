@@ -1,6 +1,7 @@
 package triplestore
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/binary"
 	"fmt"
@@ -13,6 +14,24 @@ type Decoder interface {
 	Decode() ([]Triple, error)
 }
 
+// Use for retro compatibilty when changing file format on existing stores
+func NewAutoDecoder(r io.Reader) Decoder {
+	if IsBinaryFormat(r) {
+		return NewBinaryDecoder(r)
+	}
+	return NewNTriplesDecoder(r)
+}
+
+func IsBinaryFormat(r io.Reader) bool {
+	begin, err := bufio.NewReader(r).Peek(binary.Size(wordLength(0)) + 1)
+	if err != nil {
+		return false
+	}
+	dec := &binaryDecoder{r: bytes.NewReader(begin)}
+	_, err = dec.readWord()
+	return err == nil
+}
+
 type binaryDecoder struct {
 	r       io.Reader
 	triples []Triple
@@ -20,12 +39,6 @@ type binaryDecoder struct {
 
 func NewBinaryDecoder(r io.Reader) Decoder {
 	return &binaryDecoder{r: r}
-}
-
-func IsBinaryFormat(data []byte) bool {
-	dec := &binaryDecoder{r: bytes.NewReader(data)}
-	_, err := dec.readWord()
-	return err == nil
 }
 
 func (dec *binaryDecoder) Decode() ([]Triple, error) {

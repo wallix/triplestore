@@ -11,25 +11,28 @@ import (
 )
 
 func TestDetectBinaryFormat(t *testing.T) {
+	var buff bytes.Buffer
+
+	if got, want := IsBinaryFormat(&buff), false; got != want {
+		t.Fatalf("got %t, want %t", got, want)
+	}
+
 	triples := []Triple{
 		SubjPred("1", "2").Resource("3"),
 		SubjPred("one", "two").Resource("three"),
 	}
 
-	var buff bytes.Buffer
 	NewBinaryEncoder(&buff).Encode(triples...)
-
-	if got, want := IsBinaryFormat(buff.Bytes()), true; got != want {
+	if got, want := IsBinaryFormat(&buff), true; got != want {
 		t.Fatalf("got %t, want %t", got, want)
 	}
 
 	buff.Reset()
 	NewNTriplesEncoder(&buff).Encode(triples...)
-	if got, want := IsBinaryFormat(buff.Bytes()), false; got != want {
+	if got, want := IsBinaryFormat(&buff), false; got != want {
 		t.Fatalf("got %t, want %t", got, want)
 	}
 }
-
 func TestEncodeAndDecodeAllTripleTypes(t *testing.T) {
 	tcases := []struct {
 		in Triple
