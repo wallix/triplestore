@@ -8,6 +8,39 @@ import (
 	tstore "github.com/wallix/triplestore"
 )
 
+func TestCopyAndCloneTriples(t *testing.T) {
+	s := tstore.NewSource()
+	all := []tstore.Triple{
+		tstore.SubjPred("one", "two").StringLiteral("three"),
+		tstore.SubjPred("four", "two").IntegerLiteral(42),
+		tstore.SubjPred("one", "two").Resource("four"),
+	}
+	s.Add(all...)
+
+	copied := s.CopyTriples()
+	if got, want := len(copied), 3; got != want {
+		t.Fatalf("got %d, want %d", got, want)
+	}
+
+	// Full verification of first copy
+	if got, want := copied[0].Subject(), "one"; got != want {
+		t.Fatalf("got %s, want %s", got, want)
+	}
+	if got, want := copied[0].Predicate(), "two"; got != want {
+		t.Fatalf("got %s, want %s", got, want)
+	}
+	if got, want := copied[0].Object(), tstore.StringLiteral("three"); got != want {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+
+	snap := s.Snapshot()
+	for _, c := range copied {
+		if !snap.Contains(c) {
+			t.Fatalf("should contains triple %v", c)
+		}
+	}
+}
+
 func TestQueries(t *testing.T) {
 	all := []tstore.Triple{
 		tstore.SubjPred("one", "two").StringLiteral("three"),
