@@ -113,15 +113,15 @@ func (enc *ntriplesEncoder) Encode(tris ...Triple) error {
 		if rid, ok := t.Object().Resource(); ok {
 			buff.WriteString(fmt.Sprintf("<%s>", enc.buildIRI(rid)))
 		} else if lit, ok := t.Object().Literal(); ok {
-			var namespace string
+			quoted := strconv.QuoteToASCII(lit.Value())
 			switch lit.Type() {
 			case XsdString:
 				// namespace empty as per spec
+				buff.WriteString(fmt.Sprintf("%s", quoted))
 			default:
-				namespace = lit.Type().NTriplesNamespaced()
+				buff.WriteString(fmt.Sprintf("%s^^%s", quoted, lit.Type().NTriplesNamespaced()))
 			}
 
-			buff.WriteString(fmt.Sprintf("%s%s", strconv.QuoteToASCII(lit.Value()), namespace))
 		}
 
 		buff.Write([]byte(" ."))
