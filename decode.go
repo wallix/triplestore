@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"sync"
 )
@@ -30,6 +31,22 @@ func IsBinaryFormat(r io.Reader) bool {
 	dec := &binaryDecoder{r: bytes.NewReader(begin)}
 	_, err = dec.readWord()
 	return err == nil
+}
+
+func NewNTriplesDecoder(r io.Reader) Decoder {
+	return &ntDecoder{r: r}
+}
+
+type ntDecoder struct {
+	r io.Reader
+}
+
+func (d *ntDecoder) Decode() ([]Triple, error) {
+	b, err := ioutil.ReadAll(d.r)
+	if err != nil {
+		return nil, err
+	}
+	return newNTParser(string(b)).parse(), err
 }
 
 type binaryDecoder struct {

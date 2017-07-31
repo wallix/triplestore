@@ -17,19 +17,21 @@ func TestCopyAndCloneTriples(t *testing.T) {
 	}
 	s.Add(all...)
 
-	copied := s.CopyTriples()
+	copied := tstore.Triples(s.CopyTriples())
 	if got, want := len(copied), 3; got != want {
 		t.Fatalf("got %d, want %d", got, want)
 	}
 
+	copied.Sort()
+
 	// Full verification of first copy
-	if got, want := copied[0].Subject(), "one"; got != want {
+	if got, want := copied[1].Subject(), "one"; got != want {
 		t.Fatalf("got %s, want %s", got, want)
 	}
-	if got, want := copied[0].Predicate(), "two"; got != want {
+	if got, want := copied[1].Predicate(), "two"; got != want {
 		t.Fatalf("got %s, want %s", got, want)
 	}
-	if got, want := copied[0].Object(), tstore.StringLiteral("three"); got != want {
+	if got, want := copied[1].Object(), tstore.StringLiteral("three"); got != want {
 		t.Fatalf("got %v, want %v", got, want)
 	}
 

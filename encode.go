@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"net/url"
-	"strconv"
 	"strings"
 )
 
@@ -108,25 +107,29 @@ func (enc *ntriplesEncoder) Encode(tris ...Triple) error {
 	var buff bytes.Buffer
 
 	for i, t := range tris {
-		buff.WriteString(fmt.Sprintf("<%s> <%s> ", enc.buildIRI(t.Subject()), enc.buildIRI(t.Predicate())))
+		buff.WriteString("<" + enc.buildIRI(t.Subject()) + "> <" + enc.buildIRI(t.Predicate()) + "> ")
 
 		if rid, ok := t.Object().Resource(); ok {
-			buff.WriteString(fmt.Sprintf("<%s>", enc.buildIRI(rid)))
+			buff.WriteString("<" + enc.buildIRI(rid) + ">")
 		} else if lit, ok := t.Object().Literal(); ok {
-			var namespace string
 			switch lit.Type() {
 			case XsdString:
 				// namespace empty as per spec
+				buff.WriteString("\"" + lit.Value() + "\"")
 			default:
-				namespace = lit.Type().NTriplesNamespaced()
+				if ctx := enc.c; ctx != nil {
+					if _, ok := ctx.Prefixes["xsd"]; ok {
+						buff.WriteString("\"" + lit.Value() + "\"^^<" + lit.Type().NTriplesNamespaced() + ">")
+					}
+				} else {
+					buff.WriteString("\"" + lit.Value() + "\"^^<" + string(lit.Type()) + ">")
+				}
 			}
-
-			buff.WriteString(fmt.Sprintf("%s%s", strconv.QuoteToASCII(lit.Value()), namespace))
 		}
 
 		buff.Write([]byte(" ."))
 		if i != len(tris)-1 {
-			buff.Write([]byte("\n"))
+			buff.WriteByte('\n')
 		}
 	}
 
