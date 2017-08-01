@@ -119,10 +119,10 @@ func (enc *ntriplesEncoder) Encode(tris ...Triple) error {
 			default:
 				if ctx := enc.c; ctx != nil {
 					if _, ok := ctx.Prefixes["xsd"]; ok {
-						buff.WriteString(fmt.Sprintf("\"%s\"^^%s", lit.Value(), lit.Type().NTriplesNamespaced()))
+						buff.WriteString(fmt.Sprintf("\"%s\"^^<%s>", lit.Value(), lit.Type().NTriplesNamespaced()))
 					}
 				} else {
-					buff.WriteString(fmt.Sprintf("\"%s\"^^%s", lit.Value(), lit.Type()))
+					buff.WriteString(fmt.Sprintf("\"%s\"^^<%s>", lit.Value(), lit.Type()))
 				}
 			}
 		}

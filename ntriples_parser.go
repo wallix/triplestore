@@ -2,6 +2,7 @@ package triplestore
 
 import (
 	"bufio"
+	"fmt"
 	"unicode/utf8"
 )
 
@@ -95,6 +96,18 @@ type ntToken struct {
 	lit string
 }
 
+func nodeTok(s string) ntToken     { return ntToken{t: NODE_TOK, lit: s} }
+func litTok(s string) ntToken      { return ntToken{t: LIT_TOK, lit: s} }
+func datatypeTok(s string) ntToken { return ntToken{t: DATATYPE_TOK, lit: s} }
+func commentTok(s string) ntToken  { return ntToken{t: COMMENT_TOK, lit: s} }
+func unknownTok(s string) ntToken  { return ntToken{t: UNKNOWN_TOK, lit: s} }
+
+var (
+	wspaceTok   = ntToken{t: WHITESPACE_TOK, lit: " "}
+	fullstopTok = ntToken{t: FULLSTOP_TOK, lit: "."}
+	eofTok      = ntToken{t: EOF_TOK}
+)
+
 type lexer struct {
 	input                  string
 	position, readPosition int
@@ -113,32 +126,40 @@ func (l *lexer) nextToken() ntToken {
 	l.readChar()
 	switch l.char {
 	case '<':
-		l.readChar()
-		n := l.readNode()
-		return ntToken{t: NODE_TOK, lit: n}
+		n := l.readIRI()
+		return nodeTok(n)
 	case ' ':
-		return ntToken{t: WHITESPACE_TOK, lit: " "}
+		return wspaceTok
 	case '.':
-		return ntToken{t: FULLSTOP_TOK, lit: "."}
+		return fullstopTok
 	case '"':
-		l.readChar()
-		n := l.readLit()
-		return ntToken{t: LIT_TOK, lit: n}
+		n := l.readStringLiteral()
+		return litTok(n)
 	case '^':
 		l.readChar()
-		n := l.readDataType()
-		if len(n) > 0 && n[0] != '^' {
-			panic("invalid datatype, missing carret")
+		if l.char == 0 {
+			return eofTok
 		}
-		return ntToken{t: DATATYPE_TOK, lit: n[1:]}
+		if l.char != '^' {
+			panic(fmt.Sprintf("invalid datatype: expecting '^', got '%c': input [%s]", l.char, l.input))
+		}
+		l.readChar()
+		if l.char == 0 {
+			return eofTok
+		}
+		if l.char != '<' {
+			panic(fmt.Sprintf("invalid datatype: expecting '<', got '%c'. Input: [%s]", l.char, l.input))
+		}
+		n := l.readIRI()
+		return datatypeTok(n)
 	case '#':
 		l.readChar()
 		n := l.readComment()
-		return ntToken{t: COMMENT_TOK, lit: n}
+		return commentTok(n)
 	case 0:
-		return ntToken{t: EOF_TOK}
+		return eofTok
 	default:
-		return ntToken{t: UNKNOWN_TOK, lit: string(l.char)}
+		return unknownTok(string(l.char))
 	}
 }
 
@@ -153,28 +174,58 @@ func (l *lexer) readChar() {
 	l.readPosition += width
 }
 
-func (l *lexer) readNode() string {
-	pos := l.position
-	for untilNodeEnd(l.char) {
-		l.readChar()
+func (l *lexer) peekNextNonWithespaceChar() (found rune, count int) {
+	pos := l.readPosition
+	if pos >= len(l.input) {
+		return 0, 0
 	}
-	return l.input[pos:l.position]
+	var width int
+	for {
+		found, width = utf8.DecodeRuneInString(l.input[pos:])
+		if width == 0 {
+			found = 0
+			return
+		}
+		count++
+		if found == ' ' {
+			pos = pos + width
+			continue
+		} else {
+			return
+		}
+	}
 }
 
-func (l *lexer) readDataType() string {
-	pos := l.position
-	for untilDataTypeEnd(l.char) {
+func (l *lexer) readIRI() string {
+	start := l.readPosition
+	for {
 		l.readChar()
+		if l.char == '>' {
+			peek, _ := l.peekNextNonWithespaceChar()
+			if peek == 0 || peek == '<' || peek == '"' || peek == '.' {
+				return l.input[start:l.position]
+			}
+		}
+		if l.char == 0 {
+			return ""
+		}
 	}
-	return l.input[pos:l.position]
 }
 
-func (l *lexer) readLit() string {
-	pos := l.position
-	for untilLitEnd(l.char) {
+func (l *lexer) readStringLiteral() string {
+	start := l.readPosition
+	for {
 		l.readChar()
+		if l.char == '"' {
+			peek, _ := l.peekNextNonWithespaceChar()
+			if peek == 0 || peek == '.' || peek == '^' {
+				return l.input[start:l.position]
+			}
+		}
+		if l.char == 0 {
+			return ""
+		}
 	}
-	return l.input[pos:l.position]
 }
 
 func (l *lexer) readComment() string {
@@ -183,14 +234,6 @@ func (l *lexer) readComment() string {
 		l.readChar()
 	}
 	return l.input[pos:l.position]
-}
-
-func untilNodeEnd(c rune) bool {
-	return c != '>' && c != '\n' && c != 0
-}
-
-func untilLitEnd(c rune) bool {
-	return c != '"' && c != '\n' && c != 0
 }
 
 func untilLineEnd(c rune) bool {

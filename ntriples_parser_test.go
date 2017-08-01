@@ -18,7 +18,7 @@ func TestParser(t *testing.T) {
 			},
 		},
 		{
-			input: "<sub> <pred> \"2\"^^myinteger .\n<sub2> <pred2> <lol2> .",
+			input: "<sub> <pred> \"2\"^^<myinteger> .\n<sub2> <pred2> <lol2> .",
 			expected: []Triple{
 				SubjPred("sub", "pred").Object(object{isLit: true, lit: literal{typ: "myinteger", val: "2"}}),
 				SubjPred("sub2", "pred2").Resource("lol2"),
@@ -44,45 +44,120 @@ func TestLexer(t *testing.T) {
 		input    string
 		expected []ntToken
 	}{
-		{"<node>", []ntToken{ntToken{t: NODE_TOK, lit: "node"}}},
-		{"# comment", []ntToken{ntToken{t: COMMENT_TOK, lit: " comment"}}},
-		{"\"lit\"", []ntToken{ntToken{t: LIT_TOK, lit: "lit"}}},
-		{"^^float", []ntToken{ntToken{t: DATATYPE_TOK, lit: "float"}}},
-		{" ", []ntToken{ntToken{t: WHITESPACE_TOK, lit: " "}}},
-		{".", []ntToken{ntToken{t: FULLSTOP_TOK, lit: "."}}},
+		// single
+		{"<node>", []ntToken{nodeTok("node")}},
+		{"# comment", []ntToken{commentTok(" comment")}},
+		{"\"lit\"", []ntToken{litTok("lit")}},
+		{"^^<xsd:float>", []ntToken{datatypeTok("xsd:float")}},
+		{" ", []ntToken{wspaceTok}},
+		{".", []ntToken{fullstopTok}},
 
-		{"<sub> <pred> \"3\"^^integer .", []ntToken{
-			ntToken{t: NODE_TOK, lit: "sub"},
-			ntToken{t: WHITESPACE_TOK, lit: " "},
-			ntToken{t: NODE_TOK, lit: "pred"},
-			ntToken{t: WHITESPACE_TOK, lit: " "},
-			ntToken{t: LIT_TOK, lit: "3"},
-			ntToken{t: DATATYPE_TOK, lit: "integer"},
-			ntToken{t: FULLSTOP_TOK, lit: "."},
+		// escaped
+		{`<no>de>`, []ntToken{nodeTok("no>de")}},
+		{`<no\>de>`, []ntToken{nodeTok("no\\>de")}},
+		{`<node\\>`, []ntToken{nodeTok("node\\\\")}},
+		{`"\\"`, []ntToken{litTok(`\\`)}},
+		{`"quot"ed"`, []ntToken{litTok(`quot"ed`)}},
+		{`"quot\"ed"`, []ntToken{litTok("quot\\\"ed")}},
+
+		// triple
+		{"<sub> <pred> \"3\"^^<xsd:integer> .", []ntToken{
+			nodeTok("sub"), wspaceTok, nodeTok("pred"), wspaceTok, litTok("3"),
+			datatypeTok("xsd:integer"), wspaceTok, fullstopTok,
+		}},
+		{"<sub><pred>\"3\"^^<xsd:integer>.", []ntToken{
+			nodeTok("sub"), nodeTok("pred"), litTok("3"), datatypeTok("xsd:integer"), fullstopTok,
 		}},
 		{"<sub> <pred> \"lit\" . # commenting", []ntToken{
-			ntToken{t: NODE_TOK, lit: "sub"},
-			ntToken{t: WHITESPACE_TOK, lit: " "},
-			ntToken{t: NODE_TOK, lit: "pred"},
-			ntToken{t: WHITESPACE_TOK, lit: " "},
-			ntToken{t: LIT_TOK, lit: "lit"},
-			ntToken{t: WHITESPACE_TOK, lit: " "},
-			ntToken{t: FULLSTOP_TOK, lit: "."},
-			ntToken{t: WHITESPACE_TOK, lit: " "},
-			ntToken{t: COMMENT_TOK, lit: " commenting"},
+			nodeTok("sub"), wspaceTok, nodeTok("pred"), wspaceTok, litTok("lit"),
+			wspaceTok, fullstopTok, wspaceTok, commentTok(" commenting"),
+		}},
+		{"<sub><pred>\"lit\".#commenting", []ntToken{
+			nodeTok("sub"), nodeTok("pred"), litTok("lit"), fullstopTok, commentTok("commenting"),
 		}},
 	}
 
-	for _, tcase := range tcases {
+	for i, tcase := range tcases {
 		l := newLexer(tcase.input)
 		var toks []ntToken
 		for tok := l.nextToken(); tok.t != EOF_TOK; tok = l.nextToken() {
 			toks = append(toks, tok)
 		}
 		if got, want := toks, tcase.expected; !reflect.DeepEqual(got, want) {
-			t.Fatalf("\ngot %#v\n\nwant %#v", got, want)
+			t.Fatalf("case %d: \ngot %#v\n\nwant %#v", i+1, got, want)
 		}
 	}
+}
+
+func TestLexerReadIRI(t *testing.T) {
+	tcases := []struct {
+		input string
+		node  string
+	}{
+		{"<", ""},
+		{">", ""},
+		{"", ""},
+		{"z", ""},
+		{"subject>", "subject"},
+		{"s  ubject>", "s  ubject"},
+		{"subject>   <", "subject"},
+		{"    subject>   <", "    subject"},
+		{"subject><", "subject"},
+		{"subje   ct><", "subje   ct"},
+		{"sub>ject>", "sub>ject"},
+		{"sub > ject>", "sub > ject"},
+		{"sub>ject>      ", "sub>ject"},
+		{"subject", ""},
+
+		{"pred>   \"", "pred"},
+		{"pred>\"", "pred"},
+
+		{"resource>.", "resource"},
+		{"resource> .", "resource"},
+		{"resource>> .", "resource>"},
+		{"resource>  .   ", "resource"},
+	}
+
+	for i, tcase := range tcases {
+		l := newLexer(tcase.input)
+		if got, want := l.readIRI(), tcase.node; got != want {
+			t.Fatalf("case %d: got '%s', want '%s'", i+1, got, want)
+		}
+	}
+
+}
+
+func TestLexerReadStringLiteral(t *testing.T) {
+	tcases := []struct {
+		input string
+		node  string
+	}{
+		{"", ""},
+		{`"`, ""},
+		{"z", ""},
+		{`lit"`, "lit"},
+		{`l it"`, "l it"},
+		{"li\"t\"", "li\"t"},
+		{"li \"t\"", "li \"t"},
+		{"li\"t\" .", "li\"t"},
+		{"li\"t\".", "li\"t"},
+		{"li\"t\" .", "li\"t"},
+		{"li\"t\"  .  ", "li\"t"},
+		{"li\"t\"^", "li\"t"},
+		{"li\"t\"^^", "li\"t"},
+		{"li\"t\" ^", "li\"t"},
+		{"li\"t\" ^^", "li\"t"},
+		{"li\"t\"   ^", "li\"t"},
+		{"li\"t\"     ^^", "li\"t"},
+	}
+
+	for i, tcase := range tcases {
+		s := newLexer(tcase.input).readStringLiteral()
+		if got, want := s, tcase.node; got != want {
+			t.Fatalf("case %d: got '%s', want '%s'", i+1, got, want)
+		}
+	}
+
 }
 
 func mustTriple(s, p string, i interface{}) Triple {
