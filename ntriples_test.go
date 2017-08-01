@@ -11,7 +11,6 @@ import (
 )
 
 func TestEncodeDecodeW3CSuite(t *testing.T) {
-	t.Skip()
 	path := filepath.Join("testdata", "w3c_ntriples", "*.nt")
 	filenames, _ := filepath.Glob(path)
 

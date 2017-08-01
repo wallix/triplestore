@@ -119,9 +119,14 @@ func (enc *ntriplesEncoder) Encode(tris ...Triple) error {
 				// namespace empty as per spec
 				buff.WriteString(fmt.Sprintf("%s", quoted))
 			default:
-				buff.WriteString(fmt.Sprintf("%s^^%s", quoted, lit.Type().NTriplesNamespaced()))
+				if ctx := enc.c; ctx != nil {
+					if _, ok := ctx.Prefixes["xsd"]; ok {
+						buff.WriteString(fmt.Sprintf("%s^^%s", quoted, lit.Type().NTriplesNamespaced()))
+					}
+				} else {
+					buff.WriteString(fmt.Sprintf("%s^^%s", quoted, lit.Type()))
+				}
 			}
-
 		}
 
 		buff.Write([]byte(" ."))

@@ -203,6 +203,7 @@ func TestEncodeNTriples(t *testing.T) {
 	var buff bytes.Buffer
 	enc := NewNTriplesEncoderWithContext(&buff, &Context{Base: "http://test.url#",
 		Prefixes: map[string]string{
+			"xsd":   "<http://www.w3.org/2001/XMLSchema#",
 			"rdf":   "http://www.w3.org/1999/02/22-rdf-syntax-ns#",
 			"cloud": "http://awless.io/rdf/cloud#",
 		}})
