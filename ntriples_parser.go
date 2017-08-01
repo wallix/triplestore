@@ -2,6 +2,7 @@ package triplestore
 
 import (
 	"bufio"
+	"unicode/utf8"
 )
 
 type ntParser struct {
@@ -97,7 +98,7 @@ type ntToken struct {
 type lexer struct {
 	input                  string
 	position, readPosition int
-	char                   byte
+	char                   rune
 
 	reader *bufio.Reader
 }
@@ -142,13 +143,14 @@ func (l *lexer) nextToken() ntToken {
 }
 
 func (l *lexer) readChar() {
+	var width int
 	if l.readPosition >= len(l.input) {
 		l.char = 0
 	} else {
-		l.char = l.input[l.readPosition]
+		l.char, width = utf8.DecodeRuneInString(l.input[l.readPosition:])
 	}
 	l.position = l.readPosition
-	l.readPosition++
+	l.readPosition += width
 }
 
 func (l *lexer) readNode() string {
@@ -183,18 +185,18 @@ func (l *lexer) readComment() string {
 	return l.input[pos:l.position]
 }
 
-func untilNodeEnd(c byte) bool {
+func untilNodeEnd(c rune) bool {
 	return c != '>' && c != '\n' && c != 0
 }
 
-func untilLitEnd(c byte) bool {
+func untilLitEnd(c rune) bool {
 	return c != '"' && c != '\n' && c != 0
 }
 
-func untilLineEnd(c byte) bool {
+func untilLineEnd(c rune) bool {
 	return c != '\n' && c != 0
 }
 
-func untilDataTypeEnd(c byte) bool {
+func untilDataTypeEnd(c rune) bool {
 	return c != ' ' && c != '\n' && c != 0
 }

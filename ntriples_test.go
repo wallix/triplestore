@@ -30,8 +30,8 @@ func TestEncodeDecodeW3CSuite(t *testing.T) {
 			t.Fatalf("file %s: re-encoding error: %s", filename, err)
 		}
 
-		if got, want := buf.Bytes(), removeNTriplesCommentsAndEmptyLines(b); !bytes.Equal(got, want) {
-			t.Fatalf("file %s: original and re-encoded mismatch\n\ngot\n%s\n\nwant\n%s\n", filename, got, want)
+		if got, want := removeNTriplesCommentsAndEmptyLines(buf.Bytes()), removeNTriplesCommentsAndEmptyLines(b); !bytes.Equal(got, want) {
+			t.Fatalf("file %s: re-encoding mismatch\n\ngot\n%q\n\nwant\n%q\n", filename, got, want)
 		}
 	}
 }
