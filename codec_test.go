@@ -14,25 +14,6 @@ import (
 	"time"
 )
 
-// BenchmarkEncodingMemallocation-4   	   20000	     71052 ns/op	   27488 B/op	    1209 allocs/op
-func BenchmarkEncodingMemallocation(b *testing.B) {
-	var triples []Triple
-
-	for i := 0; i < 100; i++ {
-		triples = append(triples, SubjPred(fmt.Sprint(i), "digit").IntegerLiteral(i))
-	}
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		var buff bytes.Buffer
-		err := NewBinaryEncoder(&buff).Encode(triples...)
-		if err != nil {
-			b.Fatal(err)
-		}
-	}
-
-}
-
 func TestDetectBinaryFormat(t *testing.T) {
 	var buff bytes.Buffer
 
