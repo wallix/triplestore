@@ -52,6 +52,15 @@ func BenchmarkAllEncoding(b *testing.B) {
 			}
 		}
 	})
+	b.Run("ntriples with context", func(b *testing.B) {
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			var buff bytes.Buffer
+			if err := NewNTriplesEncoderWithContext(&buff, RDFContext).Encode(triples...); err != nil {
+				b.Fatal(err)
+			}
+		}
+	})
 }
 
 func BenchmarkAllDecoding(b *testing.B) {
