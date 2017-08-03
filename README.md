@@ -16,6 +16,7 @@ Here the RDF triples implementation follows along the [W3C RDF concepts](https:/
 - Snapshot and query RDFGraphs
 - Encode triples to binary, [DOT](https://en.wikipedia.org/wiki/DOT_(graph_description_language)), NTriples format
 - Decode triples from binary, NTriples format (verification against [W3C test suite](https://www.w3.org/2013/N-TriplesTests/) in progress)
+- Stream encoding/decoding (for binary and NTriples format) for memory conscious program 
 - CLI (Command line interface) utility to read and convert triples files.
 
 ## Library 

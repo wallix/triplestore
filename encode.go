@@ -2,6 +2,7 @@ package triplestore
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -11,6 +12,10 @@ import (
 
 type Encoder interface {
 	Encode(tris ...Triple) error
+}
+
+type StreamEncoder interface {
+	Encode(context.Context, <-chan Triple) error
 }
 
 func NewContext() *Context {
@@ -30,16 +35,44 @@ var RDFContext = &Context{
 	},
 }
 
-type binaryEncoder struct {
-	w io.Writer
-}
-
 type wordLength uint32
 
 const (
 	resourceTypeEncoding = uint8(0)
 	literalTypeEncoding  = uint8(1)
 )
+
+type binaryStreamEncoder struct {
+	w io.Writer
+}
+
+func NewBinaryStreamEncoder(w io.Writer) StreamEncoder {
+	return &binaryStreamEncoder{w}
+}
+
+func (enc *binaryStreamEncoder) Encode(ctx context.Context, triples <-chan Triple) error {
+	if triples == nil {
+		return nil
+	}
+	var buf bytes.Buffer
+	for {
+		select {
+		case tri, ok := <-triples:
+			if !ok {
+				return nil
+			}
+			if err := writeTriple(tri, &buf, enc.w); err != nil {
+				return err
+			}
+		case <-ctx.Done():
+			return nil
+		}
+	}
+}
+
+type binaryEncoder struct {
+	w io.Writer
+}
 
 func NewBinaryEncoder(w io.Writer) Encoder {
 	return &binaryEncoder{w}
@@ -48,16 +81,21 @@ func NewBinaryEncoder(w io.Writer) Encoder {
 func (enc *binaryEncoder) Encode(tris ...Triple) error {
 	var buf bytes.Buffer
 	for _, t := range tris {
-		if err := encodeTriple(t, &buf); err != nil {
+		if err := writeTriple(t, &buf, enc.w); err != nil {
 			return err
 		}
-
-		if _, err := enc.w.Write(buf.Bytes()); err != nil {
-			return err
-		}
-		buf.Reset()
 	}
+	return nil
+}
 
+func writeTriple(t Triple, buf *bytes.Buffer, w io.Writer) error {
+	if err := encodeTriple(t, buf); err != nil {
+		return err
+	}
+	if _, err := w.Write(buf.Bytes()); err != nil {
+		return err
+	}
+	buf.Reset()
 	return nil
 }
 
