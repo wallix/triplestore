@@ -96,9 +96,10 @@ func BenchmarkAllEncoding(b *testing.B) {
 	})
 }
 
-// BenchmarkAllDecoding/binary-4                   	 3000000	       414 ns/op
-// BenchmarkAllDecoding/binary_streaming-4         	  200000	      5636 ns/op
-// BenchmarkAllDecoding/ntriples-4                 	 3000000	       577 ns/op
+// BenchmarkAllDecoding/binary-4         	         3000000	       436 ns/op
+// BenchmarkAllDecoding/binary_streaming-4         	  200000	      5523 ns/op
+// BenchmarkAllDecoding/ntriples-4                 	 3000000	       580 ns/op
+// BenchmarkAllDecoding/ntriples_streaming-4       	 1000000	      1884 ns/op
 func BenchmarkAllDecoding(b *testing.B) {
 	binaryFile, err := os.Open(filepath.Join("testdata", "bench", "decode_1.bin"))
 	if err != nil {
@@ -138,6 +139,24 @@ func BenchmarkAllDecoding(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			if _, err := NewNTriplesDecoder(ntFile).Decode(); err != nil {
 				b.Fatal(err)
+			}
+		}
+	})
+
+	b.Run("ntriples streaming", func(b *testing.B) {
+		ntFile, err := os.Open(filepath.Join("testdata", "bench", "decode_1.nt"))
+		if err != nil {
+			b.Fatal(err)
+		}
+		defer ntFile.Close()
+		b.ResetTimer()
+
+		for i := 0; i < b.N; i++ {
+			results := NewNTriplesStreamDecoder(ntFile).StreamDecode(context.Background())
+			for r := range results {
+				if r.Err != nil {
+					b.Fatal(r.Err)
+				}
 			}
 		}
 	})

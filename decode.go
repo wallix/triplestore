@@ -46,6 +46,10 @@ func NewNTriplesDecoder(r io.Reader) Decoder {
 	return &ntDecoder{r: r}
 }
 
+func NewNTriplesStreamDecoder(r io.Reader) StreamDecoder {
+	return &ntDecoder{r: r}
+}
+
 type ntDecoder struct {
 	r io.Reader
 }
@@ -60,6 +64,31 @@ func (d *ntDecoder) Decode() ([]Triple, error) {
 
 func (d *ntDecoder) StreamDecode(ctx context.Context) <-chan DecodeResult {
 	decC := make(chan DecodeResult)
+
+	go func() {
+		defer close(decC)
+
+		scanner := bufio.NewScanner(d.r)
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			default:
+				if scanner.Scan() {
+					tris := newNTParser(scanner.Text()).parse()
+					if len(tris) == 1 {
+						decC <- DecodeResult{Tri: tris[0]}
+					}
+				} else {
+					if err := scanner.Err(); err != nil {
+						decC <- DecodeResult{Err: err}
+					}
+					return
+				}
+			}
+		}
+	}()
+
 	return decC
 }
 
