@@ -28,10 +28,11 @@ func BenchmarkEncodingMemallocation(b *testing.B) {
 
 }
 
-// BenchmarkAllEncoding/binary-4         	            2000	    662725 ns/op
-// BenchmarkAllEncoding/binary_streaming-4         	    1000	   1195385 ns/op
-// BenchmarkAllEncoding/ntriples-4                 	    5000	    346044 ns/op
-// BenchmarkAllEncoding/ntriples_with_context-4    	    2000	   1134855 ns/op
+// BenchmarkAllEncoding/binary-4         	            2000	    660310 ns/op
+// BenchmarkAllEncoding/binary_streaming-4         	    2000	   1201230 ns/op
+// BenchmarkAllEncoding/ntriples-4                 	    5000	    343913 ns/op
+// BenchmarkAllEncoding/ntriples_streaming-4       	    2000	    767048 ns/op
+// BenchmarkAllEncoding/ntriples_with_context-4    	    2000	   1129411 ns/op
 func BenchmarkAllEncoding(b *testing.B) {
 	var triples []Triple
 
@@ -57,7 +58,7 @@ func BenchmarkAllEncoding(b *testing.B) {
 			go tripleChan(triples, triC)
 			b.StartTimer()
 			var buff bytes.Buffer
-			if err := NewBinaryStreamEncoder(&buff).Encode(context.Background(), triC); err != nil {
+			if err := NewBinaryStreamEncoder(&buff).StreamEncode(context.Background(), triC); err != nil {
 				b.Fatal(err)
 			}
 		}
@@ -71,6 +72,20 @@ func BenchmarkAllEncoding(b *testing.B) {
 			}
 		}
 	})
+
+	b.Run("ntriples streaming", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			b.StopTimer()
+			triC := make(chan Triple)
+			go tripleChan(triples, triC)
+			b.StartTimer()
+			var buff bytes.Buffer
+			if err := NewNTriplesStreamEncoder(&buff).StreamEncode(context.Background(), triC); err != nil {
+				b.Fatal(err)
+			}
+		}
+	})
+
 	b.Run("ntriples with context", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			var buff bytes.Buffer
@@ -103,7 +118,7 @@ func BenchmarkAllDecoding(b *testing.B) {
 
 	b.Run("binary streaming", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
-			results := NewBinaryStreamDecoder(binaryFile).Decode(context.Background())
+			results := NewBinaryStreamDecoder(binaryFile).StreamDecode(context.Background())
 			for r := range results {
 				if r.Err != nil {
 					b.Fatal(r.Err)

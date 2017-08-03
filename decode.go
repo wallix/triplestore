@@ -22,7 +22,7 @@ type DecodeResult struct {
 }
 
 type StreamDecoder interface {
-	Decode(context.Context) <-chan DecodeResult
+	StreamDecode(context.Context) <-chan DecodeResult
 }
 
 // Use for retro compatibilty when changing file format on existing stores
@@ -58,15 +58,22 @@ func (d *ntDecoder) Decode() ([]Triple, error) {
 	return newNTParser(string(b)).parse(), err
 }
 
-type binaryStreamDecoder struct {
-	r io.ReadCloser
+func (d *ntDecoder) StreamDecode(ctx context.Context) <-chan DecodeResult {
+	decC := make(chan DecodeResult)
+	return decC
+}
+
+type binaryDecoder struct {
+	r       io.Reader
+	rc      io.ReadCloser // for stream decoding
+	triples []Triple
 }
 
 func NewBinaryStreamDecoder(r io.ReadCloser) StreamDecoder {
-	return &binaryStreamDecoder{r: r}
+	return &binaryDecoder{rc: r}
 }
 
-func (dec *binaryStreamDecoder) Decode(ctx context.Context) <-chan DecodeResult {
+func (dec *binaryDecoder) StreamDecode(ctx context.Context) <-chan DecodeResult {
 	decC := make(chan DecodeResult)
 
 	go func() {
@@ -76,7 +83,7 @@ func (dec *binaryStreamDecoder) Decode(ctx context.Context) <-chan DecodeResult 
 			case <-ctx.Done():
 				return
 			default:
-				tri, done, err := decodeTriple(dec.r)
+				tri, done, err := decodeTriple(dec.rc)
 				if done {
 					return
 				}
@@ -86,11 +93,6 @@ func (dec *binaryStreamDecoder) Decode(ctx context.Context) <-chan DecodeResult 
 	}()
 
 	return decC
-}
-
-type binaryDecoder struct {
-	r       io.Reader
-	triples []Triple
 }
 
 func NewBinaryDecoder(r io.Reader) Decoder {
