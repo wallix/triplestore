@@ -45,7 +45,7 @@ func TestLexer(t *testing.T) {
 		expected []ntToken
 	}{
 		// single
-		{"<node>", []ntToken{nodeTok("node")}},
+		{"<node>", []ntToken{iriTok("node")}},
 		{"# comment", []ntToken{commentTok(" comment")}},
 		{"\"lit\"", []ntToken{litTok("lit")}},
 		{"^^<xsd:float>", []ntToken{datatypeTok("xsd:float")}},
@@ -53,34 +53,34 @@ func TestLexer(t *testing.T) {
 		{".", []ntToken{fullstopTok}},
 
 		// escaped
-		{`<no>de>`, []ntToken{nodeTok("no>de")}},
-		{`<no\>de>`, []ntToken{nodeTok("no\\>de")}},
-		{`<node\\>`, []ntToken{nodeTok("node\\\\")}},
+		{`<no>de>`, []ntToken{iriTok("no>de")}},
+		{`<no\>de>`, []ntToken{iriTok("no\\>de")}},
+		{`<node\\>`, []ntToken{iriTok("node\\\\")}},
 		{`"\\"`, []ntToken{litTok(`\\`)}},
 		{`"quot"ed"`, []ntToken{litTok(`quot"ed`)}},
 		{`"quot\"ed"`, []ntToken{litTok("quot\\\"ed")}},
 
 		// triple
 		{"<sub> <pred> \"3\"^^<xsd:integer> .", []ntToken{
-			nodeTok("sub"), wspaceTok, nodeTok("pred"), wspaceTok, litTok("3"),
+			iriTok("sub"), wspaceTok, iriTok("pred"), wspaceTok, litTok("3"),
 			datatypeTok("xsd:integer"), wspaceTok, fullstopTok,
 		}},
 		{"<sub><pred>\"3\"^^<xsd:integer>.", []ntToken{
-			nodeTok("sub"), nodeTok("pred"), litTok("3"), datatypeTok("xsd:integer"), fullstopTok,
+			iriTok("sub"), iriTok("pred"), litTok("3"), datatypeTok("xsd:integer"), fullstopTok,
 		}},
 		{"<sub> <pred> \"lit\" . # commenting", []ntToken{
-			nodeTok("sub"), wspaceTok, nodeTok("pred"), wspaceTok, litTok("lit"),
+			iriTok("sub"), wspaceTok, iriTok("pred"), wspaceTok, litTok("lit"),
 			wspaceTok, fullstopTok, wspaceTok, commentTok(" commenting"),
 		}},
 		{"<sub><pred>\"lit\".#commenting", []ntToken{
-			nodeTok("sub"), nodeTok("pred"), litTok("lit"), fullstopTok, commentTok("commenting"),
+			iriTok("sub"), iriTok("pred"), litTok("lit"), fullstopTok, commentTok("commenting"),
 		}},
 	}
 
 	for i, tcase := range tcases {
 		l := newLexer(tcase.input)
 		var toks []ntToken
-		for tok := l.nextToken(); tok.t != EOF_TOK; tok = l.nextToken() {
+		for tok := l.nextToken(); tok.kind != EOF_TOK; tok = l.nextToken() {
 			toks = append(toks, tok)
 		}
 		if got, want := toks, tcase.expected; !reflect.DeepEqual(got, want) {

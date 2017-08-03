@@ -1,7 +1,6 @@
 package triplestore
 
 import (
-	"bufio"
 	"fmt"
 	"unicode/utf8"
 )
@@ -31,12 +30,12 @@ func (p *ntParser) parse() []Triple {
 		nodeCount = 0
 	}
 
-	for tok.t != EOF_TOK {
+	for tok.kind != EOF_TOK {
 		tok = p.lex.nextToken()
-		switch tok.t {
+		switch tok.kind {
 		case COMMENT_TOK:
 			continue
-		case NODE_TOK:
+		case IRI_TOK:
 			nodeCount++
 			switch nodeCount {
 			case 1:
@@ -82,7 +81,7 @@ type ntTokenType int
 
 const (
 	UNKNOWN_TOK ntTokenType = iota
-	NODE_TOK
+	IRI_TOK
 	EOF_TOK
 	WHITESPACE_TOK
 	FULLSTOP_TOK
@@ -92,28 +91,26 @@ const (
 )
 
 type ntToken struct {
-	t   ntTokenType
-	lit string
+	kind ntTokenType
+	lit  string
 }
 
-func nodeTok(s string) ntToken     { return ntToken{t: NODE_TOK, lit: s} }
-func litTok(s string) ntToken      { return ntToken{t: LIT_TOK, lit: s} }
-func datatypeTok(s string) ntToken { return ntToken{t: DATATYPE_TOK, lit: s} }
-func commentTok(s string) ntToken  { return ntToken{t: COMMENT_TOK, lit: s} }
-func unknownTok(s string) ntToken  { return ntToken{t: UNKNOWN_TOK, lit: s} }
+func iriTok(s string) ntToken      { return ntToken{kind: IRI_TOK, lit: s} }
+func litTok(s string) ntToken      { return ntToken{kind: LIT_TOK, lit: s} }
+func datatypeTok(s string) ntToken { return ntToken{kind: DATATYPE_TOK, lit: s} }
+func commentTok(s string) ntToken  { return ntToken{kind: COMMENT_TOK, lit: s} }
+func unknownTok(s string) ntToken  { return ntToken{kind: UNKNOWN_TOK, lit: s} }
 
 var (
-	wspaceTok   = ntToken{t: WHITESPACE_TOK, lit: " "}
-	fullstopTok = ntToken{t: FULLSTOP_TOK, lit: "."}
-	eofTok      = ntToken{t: EOF_TOK}
+	wspaceTok   = ntToken{kind: WHITESPACE_TOK, lit: " "}
+	fullstopTok = ntToken{kind: FULLSTOP_TOK, lit: "."}
+	eofTok      = ntToken{kind: EOF_TOK}
 )
 
 type lexer struct {
 	input                  string
 	position, readPosition int
 	char                   rune
-
-	reader *bufio.Reader
 }
 
 func newLexer(s string) *lexer {
@@ -127,7 +124,7 @@ func (l *lexer) nextToken() ntToken {
 	switch l.char {
 	case '<':
 		n := l.readIRI()
-		return nodeTok(n)
+		return iriTok(n)
 	case ' ':
 		return wspaceTok
 	case '.':
@@ -238,8 +235,4 @@ func (l *lexer) readComment() string {
 
 func untilLineEnd(c rune) bool {
 	return c != '\n' && c != 0
-}
-
-func untilDataTypeEnd(c rune) bool {
-	return c != ' ' && c != '\n' && c != 0
 }
