@@ -1,7 +1,9 @@
 package triplestore
 
 import (
+	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -28,7 +30,10 @@ func TestParser(t *testing.T) {
 
 	for j, tcase := range tcases {
 		p := newNTParser(tcase.input)
-		tris := p.parse()
+		tris, err := p.parse()
+		if err != nil {
+			t.Fatal(err)
+		}
 		if got, want := len(tris), len(tcase.expected); got != want {
 			t.Fatalf("triples size (case %d): got %d, want %d", j+1, got, want)
 		}
@@ -39,6 +44,29 @@ func TestParser(t *testing.T) {
 		}
 	}
 }
+
+func TestParserErrorHandling(t *testing.T) {
+	tcases := []struct {
+		input       string
+		errContains string
+	}{
+		{input: "<sub> <pred> 1 ."},
+		//{input: "<one> <two> <three>, <four> ."}, passes
+	}
+
+	for _, tcase := range tcases {
+		tris, err := newNTParser(tcase.input).parse()
+		if err == nil {
+			t.Fatalf("expected err, got none. Triples parsed:\n%#v", Triples(tris).Map(func(tr Triple) string { return fmt.Sprint(tr) }))
+		}
+		if msg := tcase.errContains; msg != "" {
+			if !strings.Contains(err.Error(), msg) {
+				t.Fatalf("expected '%s' to contains '%s'", err.Error(), tcase.errContains)
+			}
+		}
+	}
+}
+
 func TestLexer(t *testing.T) {
 	tcases := []struct {
 		input    string
@@ -80,7 +108,7 @@ func TestLexer(t *testing.T) {
 	for i, tcase := range tcases {
 		l := newLexer(tcase.input)
 		var toks []ntToken
-		for tok := l.nextToken(); tok.kind != EOF_TOK; tok = l.nextToken() {
+		for tok, _ := l.nextToken(); tok.kind != EOF_TOK; tok, _ = l.nextToken() {
 			toks = append(toks, tok)
 		}
 		if got, want := toks, tcase.expected; !reflect.DeepEqual(got, want) {
@@ -96,8 +124,11 @@ func TestLexerReadIRI(t *testing.T) {
 	}{
 		{"<", ""},
 		{">", ""},
+		{" >", " "},
 		{"", ""},
 		{"z", ""},
+		{`\z>`, "\\z"},
+		{"\n>", "\n"},
 		{"subject>", "subject"},
 		{"s  ubject>", "s  ubject"},
 		{"subject>   <", "subject"},
@@ -120,8 +151,12 @@ func TestLexerReadIRI(t *testing.T) {
 
 	for i, tcase := range tcases {
 		l := newLexer(tcase.input)
-		if got, want := l.readIRI(), tcase.node; got != want {
-			t.Fatalf("case %d: got '%s', want '%s'", i+1, got, want)
+		n, err := l.readIRI()
+		if err != nil {
+			t.Fatalf("case %d: '%s': %s", i+1, tcase.input, err)
+		}
+		if got, want := n, tcase.node; got != want {
+			t.Fatalf("case %d '%s': got '%s', want '%s'", i+1, tcase.input, got, want)
 		}
 	}
 
@@ -134,7 +169,9 @@ func TestLexerReadStringLiteral(t *testing.T) {
 	}{
 		{"", ""},
 		{`"`, ""},
+		{`  "`, "  "},
 		{"z", ""},
+		{`\n"`, "\\n"},
 		{`lit"`, "lit"},
 		{`l it"`, "l it"},
 		{"li\"t\"", "li\"t"},
@@ -152,12 +189,15 @@ func TestLexerReadStringLiteral(t *testing.T) {
 	}
 
 	for i, tcase := range tcases {
-		s := newLexer(tcase.input).readStringLiteral()
-		if got, want := s, tcase.node; got != want {
+		l := newLexer(tcase.input)
+		n, err := l.readStringLiteral()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got, want := n, tcase.node; got != want {
 			t.Fatalf("case %d: got '%s', want '%s'", i+1, got, want)
 		}
 	}
-
 }
 
 func mustTriple(s, p string, i interface{}) Triple {

@@ -172,32 +172,6 @@ func TestDecodeDataset(t *testing.T) {
 		t.Fatalf("decoded dataset should contains %v", two)
 	}
 }
-
-func TestEncodeDecodeW3CSuite(t *testing.T) {
-	path := filepath.Join("testdata", "w3c_ntriples", "*.nt")
-	filenames, _ := filepath.Glob(path)
-
-	for _, filename := range filenames {
-		b, err := ioutil.ReadFile(filename)
-		if err != nil {
-			t.Fatalf("cannot read file %s", filename)
-		}
-
-		tris, err := NewNTriplesDecoder(bytes.NewReader(b)).Decode()
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		var buf bytes.Buffer
-		if err := NewNTriplesEncoder(&buf).Encode(tris...); err != nil {
-			t.Fatalf("file %s: re-encoding error: %s", filename, err)
-		}
-
-		if got, want := removeNTriplesCommentsAndEmptyLines(buf.Bytes()), removeNTriplesCommentsAndEmptyLines(b); !bytes.Equal(got, want) {
-			t.Fatalf("file %s: re-encoding mismatch\n\ngot\n%q\n\nwant\n%q\n", filename, got, want)
-		}
-	}
-}
 func TestEncodeDecodeNTriples(t *testing.T) {
 	path := filepath.Join("testdata", "ntriples", "*.nt")
 	filenames, _ := filepath.Glob(path)

@@ -1,6 +1,7 @@
 package triplestore
 
 import (
+	"errors"
 	"fmt"
 	"unicode/utf8"
 )
@@ -15,23 +16,27 @@ func newNTParser(s string) *ntParser {
 	}
 }
 
-func (p *ntParser) parse() []Triple {
+func (p *ntParser) parse() ([]Triple, error) {
 	var tris []Triple
 	var tok ntToken
 	var nodeCount int
 	var sub, pred, lit, datatype string
-	var isLit, isResource, hasDatatype bool
+	var isLit, isResource, hasDatatype, fullStopped bool
 	var obj object
 
 	reset := func() {
 		sub, pred, lit, datatype = "", "", "", ""
 		obj = object{}
-		isLit, isResource, hasDatatype = false, false, false
+		isLit, isResource, hasDatatype, fullStopped = false, false, false, false
 		nodeCount = 0
 	}
 
 	for tok.kind != EOF_TOK {
-		tok = p.lex.nextToken()
+		var err error
+		tok, err = p.lex.nextToken()
+		if err != nil {
+			return tris, err
+		}
 		switch tok.kind {
 		case COMMENT_TOK:
 			continue
@@ -47,12 +52,20 @@ func (p *ntParser) parse() []Triple {
 				lit = tok.lit
 			}
 		case LIT_TOK:
+			if nodeCount != 2 {
+				return tris, errors.New("reaching literate but missing element")
+			}
+			nodeCount++
 			isLit = true
 			lit = tok.lit
 		case DATATYPE_TOK:
 			hasDatatype = true
 			datatype = tok.lit
 		case FULLSTOP_TOK:
+			if nodeCount != 3 {
+				return tris, errors.New("reaching full stop but missing element")
+			}
+			fullStopped = true
 			if isResource {
 				tris = append(tris, SubjPred(sub, pred).Resource(lit))
 			} else if isLit {
@@ -71,10 +84,21 @@ func (p *ntParser) parse() []Triple {
 			}
 			reset()
 		case UNKNOWN_TOK:
-			// noop
+			return tris, fmt.Errorf("unknown token '%s'", tok.lit)
+		case LINEFEED_TOK:
+			continue
 		}
 	}
-	return tris
+
+	if nodeCount > 0 {
+		return tris, errors.New("cannot parse line")
+	}
+
+	if nodeCount != 0 && !fullStopped {
+		return tris, errors.New("wrong number of elements")
+	}
+
+	return tris, nil
 }
 
 type ntTokenType int
@@ -88,6 +112,7 @@ const (
 	LIT_TOK
 	DATATYPE_TOK
 	COMMENT_TOK
+	LINEFEED_TOK
 )
 
 type ntToken struct {
@@ -104,6 +129,7 @@ func unknownTok(s string) ntToken  { return ntToken{kind: UNKNOWN_TOK, lit: s} }
 var (
 	wspaceTok   = ntToken{kind: WHITESPACE_TOK, lit: " "}
 	fullstopTok = ntToken{kind: FULLSTOP_TOK, lit: "."}
+	lineFeedTok = ntToken{kind: LINEFEED_TOK, lit: "\n"}
 	eofTok      = ntToken{kind: EOF_TOK}
 )
 
@@ -119,68 +145,80 @@ func newLexer(s string) *lexer {
 	}
 }
 
-func (l *lexer) nextToken() ntToken {
-	l.readChar()
+func (l *lexer) nextToken() (ntToken, error) {
+	if err := l.readChar(); err != nil {
+		return ntToken{}, err
+	}
 	switch l.char {
 	case '<':
-		n := l.readIRI()
-		return iriTok(n)
+		n, err := l.readIRI()
+		return iriTok(n), err
 	case ' ':
-		return wspaceTok
+		return wspaceTok, nil
 	case '.':
-		return fullstopTok
+		return fullstopTok, nil
+	case '\n':
+		return lineFeedTok, nil
 	case '"':
-		n := l.readStringLiteral()
-		return litTok(n)
+		n, err := l.readStringLiteral()
+		return litTok(n), err
 	case '^':
-		l.readChar()
+		if err := l.readChar(); err != nil {
+			return ntToken{}, err
+		}
 		if l.char == 0 {
-			return eofTok
+			return eofTok, nil
 		}
 		if l.char != '^' {
 			panic(fmt.Sprintf("invalid datatype: expecting '^', got '%c': input [%s]", l.char, l.input))
 		}
-		l.readChar()
+		if err := l.readChar(); err != nil {
+			return ntToken{}, err
+		}
 		if l.char == 0 {
-			return eofTok
+			return eofTok, nil
 		}
 		if l.char != '<' {
 			panic(fmt.Sprintf("invalid datatype: expecting '<', got '%c'. Input: [%s]", l.char, l.input))
 		}
-		n := l.readIRI()
-		return datatypeTok(n)
+		n, err := l.readIRI()
+		return datatypeTok(n), err
 	case '#':
 		l.readChar()
-		n := l.readComment()
-		return commentTok(n)
+		n, err := l.readComment()
+		return commentTok(n), err
 	case 0:
-		return eofTok
+		return eofTok, nil
 	default:
-		return unknownTok(string(l.char))
+		return unknownTok(string(l.char)), nil
 	}
 }
 
-func (l *lexer) readChar() {
+func (l *lexer) readChar() error {
 	var width int
+	var err error
 	if l.readPosition >= len(l.input) {
 		l.char = 0
 	} else {
-		l.char, width = utf8.DecodeRuneInString(l.input[l.readPosition:])
+		l.char, width, err = decodeRune(l.input[l.readPosition:], l.readPosition)
+		if err != nil {
+			return err
+		}
 	}
 	l.position = l.readPosition
 	l.readPosition += width
+	return nil
 }
 
-func (l *lexer) peekNextNonWithespaceChar() (found rune, count int) {
+func (l *lexer) peekNextNonWithespaceChar() (found rune, count int, err error) {
 	pos := l.readPosition
 	if pos >= len(l.input) {
-		return 0, 0
+		return
 	}
 	var width int
 	for {
-		found, width = utf8.DecodeRuneInString(l.input[pos:])
-		if width == 0 {
-			found = 0
+		found, width, err = decodeRune(l.input[pos:], pos)
+		if err != nil {
 			return
 		}
 		count++
@@ -193,46 +231,76 @@ func (l *lexer) peekNextNonWithespaceChar() (found rune, count int) {
 	}
 }
 
-func (l *lexer) readIRI() string {
+func (l *lexer) readIRI() (string, error) {
 	start := l.readPosition
 	for {
-		l.readChar()
+		if err := l.readChar(); err != nil {
+			return "", err
+		}
 		if l.char == '>' {
-			peek, _ := l.peekNextNonWithespaceChar()
+			peek, _, err := l.peekNextNonWithespaceChar()
+			if err != nil {
+				return "", err
+			}
 			if peek == 0 || peek == '<' || peek == '"' || peek == '.' {
-				return l.input[start:l.position]
+				return l.input[start:l.position], nil
 			}
 		}
 		if l.char == 0 {
-			return ""
+			return "", nil
 		}
 	}
 }
 
-func (l *lexer) readStringLiteral() string {
+func (l *lexer) readStringLiteral() (string, error) {
 	start := l.readPosition
 	for {
-		l.readChar()
+		if err := l.readChar(); err != nil {
+			return "", err
+		}
 		if l.char == '"' {
-			peek, _ := l.peekNextNonWithespaceChar()
+			peek, _, err := l.peekNextNonWithespaceChar()
+			if err != nil {
+				return "", err
+			}
 			if peek == 0 || peek == '.' || peek == '^' {
-				return l.input[start:l.position]
+				return l.input[start:l.position], nil
 			}
 		}
 		if l.char == 0 {
-			return ""
+			return "", nil
 		}
 	}
 }
 
-func (l *lexer) readComment() string {
+func (l *lexer) readComment() (string, error) {
 	pos := l.position
 	for untilLineEnd(l.char) {
-		l.readChar()
+		if err := l.readChar(); err != nil {
+			return "", err
+		}
 	}
-	return l.input[pos:l.position]
+	return l.input[pos:l.position], nil
 }
 
 func untilLineEnd(c rune) bool {
 	return c != '\n' && c != 0
+}
+
+func decodeRune(s string, pos int) (r rune, width int, err error) {
+	if s == "" {
+		return 0, 0, nil
+	}
+	r, width = utf8.DecodeRuneInString(s)
+	if r == utf8.RuneError {
+		switch width {
+		case 0:
+			err = fmt.Errorf("empty utf8 char starting at position %d", pos)
+			return
+		case 1:
+			err = fmt.Errorf("invalid utf8 encoding starting at position %d", pos)
+			return
+		}
+	}
+	return
 }
