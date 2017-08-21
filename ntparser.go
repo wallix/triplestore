@@ -106,6 +106,7 @@ type ntTokenType int
 const (
 	UNKNOWN_TOK ntTokenType = iota
 	IRI_TOK
+	BNODE_TOK
 	EOF_TOK
 	WHITESPACE_TOK
 	FULLSTOP_TOK
@@ -121,6 +122,7 @@ type ntToken struct {
 }
 
 func iriTok(s string) ntToken      { return ntToken{kind: IRI_TOK, lit: s} }
+func bnodeTok(s string) ntToken    { return ntToken{kind: BNODE_TOK, lit: s} }
 func litTok(s string) ntToken      { return ntToken{kind: LIT_TOK, lit: s} }
 func datatypeTok(s string) ntToken { return ntToken{kind: DATATYPE_TOK, lit: s} }
 func commentTok(s string) ntToken  { return ntToken{kind: COMMENT_TOK, lit: s} }
@@ -136,7 +138,8 @@ var (
 type lexer struct {
 	input                  string
 	position, readPosition int
-	char                   rune
+	char, prevChar         rune
+	width, prevWidth       int
 }
 
 func newLexer(s string) *lexer {
@@ -153,6 +156,15 @@ func (l *lexer) nextToken() (ntToken, error) {
 	case '<':
 		n, err := l.readIRI()
 		return iriTok(n), err
+	case '_':
+		if err := l.readChar(); err != nil {
+			return ntToken{}, err
+		}
+		if l.char != ':' {
+			panic(fmt.Sprintf("invalid blank node: expecting ':', got '%c': input [%s]", l.char, l.input))
+		}
+		n, err := l.readBnode()
+		return bnodeTok(n), err
 	case ' ':
 		return wspaceTok, nil
 	case '.':
@@ -195,18 +207,32 @@ func (l *lexer) nextToken() (ntToken, error) {
 }
 
 func (l *lexer) readChar() error {
-	var width int
+	l.prevChar = l.char
+	l.prevWidth = l.width
+
 	var err error
 	if l.readPosition >= len(l.input) {
 		l.char = 0
 	} else {
-		l.char, width, err = decodeRune(l.input[l.readPosition:], l.readPosition)
+		l.char, l.width, err = decodeRune(l.input[l.readPosition:], l.readPosition)
 		if err != nil {
 			return err
 		}
 	}
 	l.position = l.readPosition
-	l.readPosition += width
+	l.readPosition += l.width
+	return nil
+}
+
+func (l *lexer) unreadChar() error {
+	l.readPosition = l.position
+	if l.position >= l.width {
+		l.position = l.position - l.width
+	} else {
+		l.position = 0
+	}
+	l.char = l.prevChar
+	l.width = l.prevWidth
 	return nil
 }
 
@@ -242,12 +268,49 @@ func (l *lexer) readIRI() (string, error) {
 			if err != nil {
 				return "", err
 			}
-			if peek == 0 || peek == '<' || peek == '"' || peek == '.' {
+			if peek == 0 || peek == '<' || peek == '"' || peek == '.' || peek == '_' {
 				return l.input[start:l.position], nil
 			}
 		}
 		if l.char == 0 {
 			return "", nil
+		}
+	}
+}
+
+func (l *lexer) readBnode() (string, error) {
+	start := l.readPosition
+	for {
+		if err := l.readChar(); err != nil {
+			return "", err
+		}
+		if l.char == ' ' {
+			peek, _, err := l.peekNextNonWithespaceChar()
+			if err != nil {
+				return "", err
+			}
+			if peek == 0 || peek == '<' || peek == '.' {
+				return l.input[start:l.position], nil
+			}
+		}
+		if l.char == '.' {
+			peek, _, err := l.peekNextNonWithespaceChar()
+			if err != nil {
+				return "", err
+			}
+			if peek == 0 || peek == '#' { // brittle: but handles <sub> <pred> _:bnode.#commenting
+				s := l.input[start:l.position]
+				l.unreadChar()
+				return s, nil
+			}
+		}
+		if l.char == 0 {
+			return "", nil
+		}
+		if l.char == '<' {
+			s := l.input[start:l.position]
+			l.unreadChar()
+			return s, nil
 		}
 	}
 }

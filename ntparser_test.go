@@ -72,8 +72,10 @@ func TestLexer(t *testing.T) {
 		input    string
 		expected []ntToken
 	}{
-		// single
+		// simple
 		{"<node>", []ntToken{iriTok("node")}},
+		{"_:bnode .", []ntToken{bnodeTok("bnode"), fullstopTok}},
+		{"_:bnode <pred>", []ntToken{bnodeTok("bnode"), iriTok("pred")}},
 		{"# comment", []ntToken{commentTok(" comment")}},
 		{"\"lit\"", []ntToken{litTok("lit")}},
 		{"^^<xsd:float>", []ntToken{datatypeTok("xsd:float")}},
@@ -88,7 +90,7 @@ func TestLexer(t *testing.T) {
 		{`"quot"ed"`, []ntToken{litTok(`quot"ed`)}},
 		{`"quot\"ed"`, []ntToken{litTok("quot\\\"ed")}},
 
-		// triple
+		// triples
 		{"<sub> <pred> \"3\"^^<xsd:integer> .", []ntToken{
 			iriTok("sub"), wspaceTok, iriTok("pred"), wspaceTok, litTok("3"),
 			datatypeTok("xsd:integer"), wspaceTok, fullstopTok,
@@ -103,6 +105,17 @@ func TestLexer(t *testing.T) {
 		{"<sub><pred>\"lit\".#commenting", []ntToken{
 			iriTok("sub"), iriTok("pred"), litTok("lit"), fullstopTok, commentTok("commenting"),
 		}},
+
+		// triple with bnodes
+		{"_:sub <pred>\"lit\".#commenting", []ntToken{
+			bnodeTok("sub"), iriTok("pred"), litTok("lit"), fullstopTok, commentTok("commenting"),
+		}},
+		{"<sub> <pred> _:lit . #commenting", []ntToken{
+			iriTok("sub"), wspaceTok, iriTok("pred"), wspaceTok, bnodeTok("lit"), fullstopTok, wspaceTok, commentTok("commenting"),
+		}},
+		{"_:sub<pred>_:lit.#commenting", []ntToken{
+			bnodeTok("sub"), iriTok("pred"), bnodeTok("lit"), fullstopTok, commentTok("commenting"),
+		}},
 	}
 
 	for i, tcase := range tcases {
@@ -112,7 +125,7 @@ func TestLexer(t *testing.T) {
 			toks = append(toks, tok)
 		}
 		if got, want := toks, tcase.expected; !reflect.DeepEqual(got, want) {
-			t.Fatalf("case %d: \ngot %#v\n\nwant %#v", i+1, got, want)
+			t.Fatalf("case %d input=[%s]\ngot %#v\n\nwant %#v", i+1, tcase.input, got, want)
 		}
 	}
 }
@@ -159,9 +172,32 @@ func TestLexerReadIRI(t *testing.T) {
 			t.Fatalf("case %d '%s': got '%s', want '%s'", i+1, tcase.input, got, want)
 		}
 	}
-
 }
 
+func TestLexerReadBnode(t *testing.T) {
+	tcases := []struct {
+		input string
+		node  string
+	}{
+		{"a .", "a"},
+		{"a<", "a"},
+		{"a    <", "a"},
+		{"a <", "a"},
+		{"a .", "a"},
+		{"a     .", "a"},
+	}
+
+	for i, tcase := range tcases {
+		l := newLexer(tcase.input)
+		n, err := l.readBnode()
+		if err != nil {
+			t.Fatalf("case %d: '%s': %s", i+1, tcase.input, err)
+		}
+		if got, want := n, tcase.node; got != want {
+			t.Fatalf("case %d '%s': got '%s', want '%s'", i+1, tcase.input, got, want)
+		}
+	}
+}
 func TestLexerReadStringLiteral(t *testing.T) {
 	tcases := []struct {
 		input string
