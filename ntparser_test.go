@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-func TestParser(t *testing.T) {
+func TestNTParser(t *testing.T) {
 	tcases := []struct {
 		input    string
 		expected []Triple
@@ -26,13 +26,41 @@ func TestParser(t *testing.T) {
 				SubjPred("sub2", "pred2").Resource("lol2"),
 			},
 		},
+		{
+			input:    `<sub> <pred> "dquote:\"" .\n`,
+			expected: []Triple{SubjPred("sub", "pred").StringLiteral(`dquote:\"`)},
+		},
+		{
+			input:    "<sub> <pred> _:anon.\n",
+			expected: []Triple{SubjPred("sub", "pred").Bnode("anon")},
+		},
+		{
+			input:    `<sub> <pred> _:anon.`,
+			expected: []Triple{SubjPred("sub", "pred").Bnode("anon")},
+		},
+		{
+			input:    "<sub> <pred> \"\u00E9\".\n",
+			expected: []Triple{SubjPred("sub", "pred").StringLiteral("é")},
+		},
+		{
+			input:    "<sub> <pred> \"\u00E9\".",
+			expected: []Triple{SubjPred("sub", "pred").StringLiteral("é")},
+		},
+		{
+			input:    "<sub> <pred> \"\032\".",
+			expected: []Triple{SubjPred("sub", "pred").StringLiteral("\032")},
+		},
+		{
+			input:    "<sub> <pred> \"\x1A\".",
+			expected: []Triple{SubjPred("sub", "pred").StringLiteral("\x1A")},
+		},
 	}
 
 	for j, tcase := range tcases {
-		p := newNTParser(tcase.input)
+		p := newLenientNTParser(tcase.input)
 		tris, err := p.parse()
 		if err != nil {
-			t.Fatal(err)
+			t.Fatalf("input=[%s]: %s", tcase.input, err)
 		}
 		if got, want := len(tris), len(tcase.expected); got != want {
 			t.Fatalf("triples size (case %d): got %d, want %d", j+1, got, want)
@@ -55,7 +83,7 @@ func TestParserErrorHandling(t *testing.T) {
 	}
 
 	for _, tcase := range tcases {
-		tris, err := newNTParser(tcase.input).parse()
+		tris, err := newLenientNTParser(tcase.input).parse()
 		if err == nil {
 			t.Fatalf("expected err, got none. Triples parsed:\n%#v", Triples(tris).Map(func(tr Triple) string { return fmt.Sprint(tr) }))
 		}
@@ -81,6 +109,11 @@ func TestLexer(t *testing.T) {
 		{"^^<xsd:float>", []ntToken{datatypeTok("xsd:float")}},
 		{" ", []ntToken{wspaceTok}},
 		{".", []ntToken{fullstopTok}},
+		{"\n", []ntToken{lineFeedTok}},
+		{"# comment\n", []ntToken{commentTok(" comment"), lineFeedTok}},
+		{"@en .", []ntToken{langtagTok("en"), fullstopTok}},
+		{"@en.", []ntToken{langtagTok("en"), fullstopTok}},
+		{"@en .\n", []ntToken{langtagTok("en"), fullstopTok, lineFeedTok}},
 
 		// escaped
 		{`<no>de>`, []ntToken{iriTok("no>de")}},
@@ -115,6 +148,12 @@ func TestLexer(t *testing.T) {
 		}},
 		{"_:sub<pred>_:lit.#commenting", []ntToken{
 			bnodeTok("sub"), iriTok("pred"), bnodeTok("lit"), fullstopTok, commentTok("commenting"),
+		}},
+
+		// triples with langtag
+		{`<sub> <pred> "lit"@russ . # commenting`, []ntToken{
+			iriTok("sub"), wspaceTok, iriTok("pred"), wspaceTok, litTok("lit"),
+			langtagTok("russ"), fullstopTok, wspaceTok, commentTok(" commenting"),
 		}},
 	}
 
@@ -185,6 +224,7 @@ func TestLexerReadBnode(t *testing.T) {
 		{"a <", "a"},
 		{"a .", "a"},
 		{"a     .", "a"},
+		{"a.\n", "a"},
 	}
 
 	for i, tcase := range tcases {
@@ -207,6 +247,7 @@ func TestLexerReadStringLiteral(t *testing.T) {
 		{`"`, ""},
 		{`  "`, "  "},
 		{"z", ""},
+		{"\u00E9\" .", "\u00E9"},
 		{`\n"`, "\\n"},
 		{`lit"`, "lit"},
 		{`l it"`, "l it"},

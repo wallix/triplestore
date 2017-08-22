@@ -67,7 +67,7 @@ func BenchmarkAllEncoding(b *testing.B) {
 	b.Run("ntriples", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			var buff bytes.Buffer
-			if err := NewNTriplesEncoder(&buff).Encode(triples...); err != nil {
+			if err := NewLenientNTEncoder(&buff).Encode(triples...); err != nil {
 				b.Fatal(err)
 			}
 		}
@@ -80,7 +80,7 @@ func BenchmarkAllEncoding(b *testing.B) {
 			go tripleChan(triples, triC)
 			b.StartTimer()
 			var buff bytes.Buffer
-			if err := NewNTriplesStreamEncoder(&buff).StreamEncode(context.Background(), triC); err != nil {
+			if err := NewLenientNTStreamEncoder(&buff).StreamEncode(context.Background(), triC); err != nil {
 				b.Fatal(err)
 			}
 		}
@@ -89,7 +89,7 @@ func BenchmarkAllEncoding(b *testing.B) {
 	b.Run("ntriples with context", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			var buff bytes.Buffer
-			if err := NewNTriplesEncoderWithContext(&buff, RDFContext).Encode(triples...); err != nil {
+			if err := NewLenientNTEncoderWithContext(&buff, RDFContext).Encode(triples...); err != nil {
 				b.Fatal(err)
 			}
 		}
@@ -137,7 +137,7 @@ func BenchmarkAllDecoding(b *testing.B) {
 		b.ResetTimer()
 
 		for i := 0; i < b.N; i++ {
-			if _, err := NewNTriplesDecoder(ntFile).Decode(); err != nil {
+			if _, err := NewLenientNTDecoder(ntFile).Decode(); err != nil {
 				b.Fatal(err)
 			}
 		}
@@ -152,7 +152,7 @@ func BenchmarkAllDecoding(b *testing.B) {
 		b.ResetTimer()
 
 		for i := 0; i < b.N; i++ {
-			results := NewNTriplesStreamDecoder(ntFile).StreamDecode(context.Background())
+			results := NewLenientNTStreamDecoder(ntFile).StreamDecode(context.Background())
 			for r := range results {
 				if r.Err != nil {
 					b.Fatal(r.Err)

@@ -6,28 +6,28 @@ import (
 	"unicode/utf8"
 )
 
-type ntParser struct {
+type lenientNTParser struct {
 	lex *lexer
 }
 
-func newNTParser(s string) *ntParser {
-	return &ntParser{
+func newLenientNTParser(s string) *lenientNTParser {
+	return &lenientNTParser{
 		lex: newLexer(s),
 	}
 }
 
-func (p *ntParser) parse() ([]Triple, error) {
+func (p *lenientNTParser) parse() ([]Triple, error) {
 	var tris []Triple
 	var tok ntToken
 	var nodeCount int
-	var sub, pred, lit, datatype string
-	var isLit, isResource, hasDatatype, fullStopped bool
+	var sub, pred, lit, datatype, langtag string
+	var isLit, isResource, isSubBnode, isObjBnode, hasLangtag, hasDatatype, fullStopped bool
 	var obj object
 
 	reset := func() {
-		sub, pred, lit, datatype = "", "", "", ""
+		sub, pred, lit, datatype, langtag = "", "", "", "", ""
 		obj = object{}
-		isLit, isResource, hasDatatype, fullStopped = false, false, false, false
+		isLit, isResource, isSubBnode, isObjBnode, hasDatatype, hasLangtag, fullStopped = false, false, false, false, false, false, false
 		nodeCount = 0
 	}
 
@@ -51,9 +51,27 @@ func (p *ntParser) parse() ([]Triple, error) {
 				isResource = true
 				lit = tok.lit
 			}
+		case BNODE_TOK:
+			nodeCount++
+			switch nodeCount {
+			case 1:
+				sub = tok.lit
+				isSubBnode = true
+			case 2:
+				return tris, errors.New("blank node can only be subject or object")
+			case 3:
+				isObjBnode = true
+				lit = tok.lit
+			}
+		case LANGTAG_TOK:
+			if nodeCount != 3 {
+				return tris, errors.New("langtag misplaced")
+			}
+			hasLangtag = true
+			langtag = tok.lit
 		case LIT_TOK:
 			if nodeCount != 2 {
-				return tris, errors.New("reaching literate but missing element")
+				return tris, fmt.Errorf("tok '%s':reaching literate but missing element (node count %d)", tok.lit, nodeCount)
 			}
 			nodeCount++
 			isLit = true
@@ -63,11 +81,20 @@ func (p *ntParser) parse() ([]Triple, error) {
 			datatype = tok.lit
 		case FULLSTOP_TOK:
 			if nodeCount != 3 {
-				return tris, errors.New("reaching full stop but missing element")
+				return tris, fmt.Errorf("reaching full stop but missing element (node count %d)", nodeCount)
 			}
 			fullStopped = true
+			var tBuilder *tripleBuilder
+			if isSubBnode {
+				tBuilder = BnodePred(sub, pred)
+			} else {
+				tBuilder = SubjPred(sub, pred)
+			}
+
 			if isResource {
-				tris = append(tris, SubjPred(sub, pred).Resource(lit))
+				tris = append(tris, tBuilder.Resource(lit))
+			} else if isObjBnode {
+				tris = append(tris, tBuilder.Bnode(lit))
 			} else if isLit {
 				if hasDatatype {
 					obj = object{
@@ -77,21 +104,25 @@ func (p *ntParser) parse() ([]Triple, error) {
 							val: lit,
 						},
 					}
-					tris = append(tris, SubjPred(sub, pred).Object(obj))
+					tris = append(tris, tBuilder.Object(obj))
 				} else {
-					tris = append(tris, SubjPred(sub, pred).StringLiteral(lit))
+					if hasLangtag {
+						tris = append(tris, tBuilder.StringLiteralWithLang(lit, langtag))
+					} else {
+						tris = append(tris, tBuilder.StringLiteral(lit))
+					}
 				}
 			}
 			reset()
 		case UNKNOWN_TOK:
-			return tris, fmt.Errorf("unknown token '%s'", tok.lit)
+			continue
 		case LINEFEED_TOK:
 			continue
 		}
 	}
 
 	if nodeCount > 0 {
-		return tris, errors.New("cannot parse line")
+		return tris, fmt.Errorf("cannot parse line (at tok: '%s')", tok.lit)
 	}
 
 	if nodeCount != 0 && !fullStopped {
@@ -112,6 +143,7 @@ const (
 	FULLSTOP_TOK
 	LIT_TOK
 	DATATYPE_TOK
+	LANGTAG_TOK
 	COMMENT_TOK
 	LINEFEED_TOK
 )
@@ -125,6 +157,7 @@ func iriTok(s string) ntToken      { return ntToken{kind: IRI_TOK, lit: s} }
 func bnodeTok(s string) ntToken    { return ntToken{kind: BNODE_TOK, lit: s} }
 func litTok(s string) ntToken      { return ntToken{kind: LIT_TOK, lit: s} }
 func datatypeTok(s string) ntToken { return ntToken{kind: DATATYPE_TOK, lit: s} }
+func langtagTok(s string) ntToken  { return ntToken{kind: LANGTAG_TOK, lit: s} }
 func commentTok(s string) ntToken  { return ntToken{kind: COMMENT_TOK, lit: s} }
 func unknownTok(s string) ntToken  { return ntToken{kind: UNKNOWN_TOK, lit: s} }
 
@@ -152,6 +185,7 @@ func (l *lexer) nextToken() (ntToken, error) {
 	if err := l.readChar(); err != nil {
 		return ntToken{}, err
 	}
+
 	switch l.char {
 	case '<':
 		n, err := l.readIRI()
@@ -174,6 +208,9 @@ func (l *lexer) nextToken() (ntToken, error) {
 	case '"':
 		n, err := l.readStringLiteral()
 		return litTok(n), err
+	case '@':
+		n, err := l.readBnode()
+		return langtagTok(n), err
 	case '^':
 		if err := l.readChar(); err != nil {
 			return ntToken{}, err
@@ -221,6 +258,7 @@ func (l *lexer) readChar() error {
 	}
 	l.position = l.readPosition
 	l.readPosition += l.width
+
 	return nil
 }
 
@@ -298,7 +336,7 @@ func (l *lexer) readBnode() (string, error) {
 			if err != nil {
 				return "", err
 			}
-			if peek == 0 || peek == '#' { // brittle: but handles <sub> <pred> _:bnode.#commenting
+			if peek == 0 || peek == '#' || peek == '\n' { // brittle: but handles <sub> <pred> _:bnode.#commenting
 				s := l.input[start:l.position]
 				l.unreadChar()
 				return s, nil
@@ -326,7 +364,7 @@ func (l *lexer) readStringLiteral() (string, error) {
 			if err != nil {
 				return "", err
 			}
-			if peek == 0 || peek == '.' || peek == '^' {
+			if peek == 0 || peek == '.' || peek == '^' || peek == '@' {
 				return l.input[start:l.position], nil
 			}
 		}
@@ -338,12 +376,19 @@ func (l *lexer) readStringLiteral() (string, error) {
 
 func (l *lexer) readComment() (string, error) {
 	pos := l.position
-	for untilLineEnd(l.char) {
+	for {
 		if err := l.readChar(); err != nil {
 			return "", err
 		}
+		if l.char == '\n' {
+			s := l.input[pos:l.position]
+			l.unreadChar()
+			return s, nil
+		}
+		if l.char == 0 {
+			return l.input[pos:l.position], nil
+		}
 	}
-	return l.input[pos:l.position], nil
 }
 
 func untilLineEnd(c rune) bool {

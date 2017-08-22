@@ -30,7 +30,7 @@ func NewAutoDecoder(r io.Reader) Decoder {
 	if IsBinaryFormat(r) {
 		return NewBinaryDecoder(r)
 	}
-	return NewNTriplesDecoder(r)
+	return NewLenientNTDecoder(r)
 }
 
 func IsBinaryFormat(r io.Reader) bool {
@@ -42,11 +42,11 @@ func IsBinaryFormat(r io.Reader) bool {
 	return err == nil
 }
 
-func NewNTriplesDecoder(r io.Reader) Decoder {
+func NewLenientNTDecoder(r io.Reader) Decoder {
 	return &ntDecoder{r: r}
 }
 
-func NewNTriplesStreamDecoder(r io.Reader) StreamDecoder {
+func NewLenientNTStreamDecoder(r io.Reader) StreamDecoder {
 	return &ntDecoder{r: r}
 }
 
@@ -59,7 +59,7 @@ func (d *ntDecoder) Decode() ([]Triple, error) {
 	if err != nil {
 		return nil, err
 	}
-	return newNTParser(string(b)).parse()
+	return newLenientNTParser(string(b)).parse()
 }
 
 func (d *ntDecoder) StreamDecode(ctx context.Context) <-chan DecodeResult {
@@ -75,7 +75,7 @@ func (d *ntDecoder) StreamDecode(ctx context.Context) <-chan DecodeResult {
 				return
 			default:
 				if scanner.Scan() {
-					tris, err := newNTParser(scanner.Text()).parse()
+					tris, err := newLenientNTParser(scanner.Text()).parse()
 					if err != nil {
 						decC <- DecodeResult{Err: err}
 					} else if len(tris) == 1 {
