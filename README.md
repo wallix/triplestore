@@ -267,6 +267,18 @@ if err != nil {
 ...
 ```
 
+### triplestore CLI
+
+This CLI is mainly ised for triples files conversion and inspection. Install it with `go get github.com/wallix/triplestore/cmd/triplestore`. Then `triplestore -h` for help.
+
+Example of usage:
+
+```sh
+triplestore -in ntriples -out bin -files fuzz/ntriples/corpus/samples.nt 
+triplestore -in ntriples -out bin -files fuzz/ntriples/corpus/samples.nt 
+triplestore -in bin -files fuzz/binary/corpus/samples.bin
+```
+
 ### RDFGraph as a Tree
 
 A tree is defined from a RDFGraph given:
@@ -284,4 +296,3 @@ You can then navigate the tree using the existing API calls
 Have a look at the [godoc](https://godoc.org/github.com/wallix/triplestore) fro more info 
 
 Note that at the moment, constructing a new tree from a graph does not verify if the tree is valid namely no cycle and each child at most one parent.
-
