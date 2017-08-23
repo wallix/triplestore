@@ -104,6 +104,7 @@ func TestLexer(t *testing.T) {
 		{"<node>", []ntToken{iriTok("node")}},
 		{"_:bnode .", []ntToken{bnodeTok("bnode"), fullstopTok}},
 		{"_:bnode <pred>", []ntToken{bnodeTok("bnode"), iriTok("pred")}},
+		{"#comment", []ntToken{commentTok("comment")}},
 		{"# comment", []ntToken{commentTok(" comment")}},
 		{"\"lit\"", []ntToken{litTok("lit")}},
 		{"^^<xsd:float>", []ntToken{datatypeTok("xsd:float")}},
@@ -114,6 +115,8 @@ func TestLexer(t *testing.T) {
 		{"@en .", []ntToken{langtagTok("en"), fullstopTok}},
 		{"@en.", []ntToken{langtagTok("en"), fullstopTok}},
 		{"@en .\n", []ntToken{langtagTok("en"), fullstopTok, lineFeedTok}},
+
+		{"#", []ntToken{commentTok("")}}, // fixed with go-fuzz
 
 		// escaped
 		{`<no>de>`, []ntToken{iriTok("no>de")}},
@@ -268,6 +271,28 @@ func TestLexerReadStringLiteral(t *testing.T) {
 	for i, tcase := range tcases {
 		l := newLexer(tcase.input)
 		n, err := l.readStringLiteral()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got, want := n, tcase.node; got != want {
+			t.Fatalf("case %d: got '%s', want '%s'", i+1, got, want)
+		}
+	}
+}
+
+func TestLexerReadComment(t *testing.T) {
+	tcases := []struct {
+		input string
+		node  string
+	}{
+		{"", ""},
+		{"#", "#"},
+		{"\n", ""},
+	}
+
+	for i, tcase := range tcases {
+		l := newLexer(tcase.input)
+		n, err := l.readComment()
 		if err != nil {
 			t.Fatal(err)
 		}

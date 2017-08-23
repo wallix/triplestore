@@ -195,7 +195,7 @@ func (l *lexer) nextToken() (ntToken, error) {
 			return ntToken{}, err
 		}
 		if l.char != ':' {
-			panic(fmt.Sprintf("invalid blank node: expecting ':', got '%c': input [%s]", l.char, l.input))
+			return ntToken{}, fmt.Errorf("invalid blank node: expecting ':', got '%c': input [%s]", l.char, l.input)
 		}
 		n, err := l.readBnode()
 		return bnodeTok(n), err
@@ -219,7 +219,7 @@ func (l *lexer) nextToken() (ntToken, error) {
 			return eofTok, nil
 		}
 		if l.char != '^' {
-			panic(fmt.Sprintf("invalid datatype: expecting '^', got '%c': input [%s]", l.char, l.input))
+			return ntToken{}, fmt.Errorf("invalid datatype: expecting '^', got '%c': input [%s]", l.char, l.input)
 		}
 		if err := l.readChar(); err != nil {
 			return ntToken{}, err
@@ -228,12 +228,11 @@ func (l *lexer) nextToken() (ntToken, error) {
 			return eofTok, nil
 		}
 		if l.char != '<' {
-			panic(fmt.Sprintf("invalid datatype: expecting '<', got '%c'. Input: [%s]", l.char, l.input))
+			return ntToken{}, fmt.Errorf("invalid datatype: expecting '<', got '%c'. Input: [%s]", l.char, l.input)
 		}
 		n, err := l.readIRI()
 		return datatypeTok(n), err
 	case '#':
-		l.readChar()
 		n, err := l.readComment()
 		return commentTok(n), err
 	case 0:
@@ -375,7 +374,7 @@ func (l *lexer) readStringLiteral() (string, error) {
 }
 
 func (l *lexer) readComment() (string, error) {
-	pos := l.position
+	pos := l.readPosition
 	for {
 		if err := l.readChar(); err != nil {
 			return "", err
@@ -389,10 +388,6 @@ func (l *lexer) readComment() (string, error) {
 			return l.input[pos:l.position], nil
 		}
 	}
-}
-
-func untilLineEnd(c rune) bool {
-	return c != '\n' && c != 0
 }
 
 func decodeRune(s string, pos int) (r rune, width int, err error) {
