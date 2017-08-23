@@ -1,4 +1,4 @@
-package tstore
+package ntriples
 
 import "github.com/wallix/triplestore"
 import "bytes"
