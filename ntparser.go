@@ -1,8 +1,12 @@
 package triplestore
 
 import (
+	"bufio"
 	"errors"
 	"fmt"
+	"io"
+	"strings"
+	"unicode"
 	"unicode/utf8"
 )
 
@@ -169,15 +173,19 @@ var (
 )
 
 type lexer struct {
+	buff                   []byte
+	reader                 *bufio.Reader
 	input                  string
 	position, readPosition int
+	current                int
 	char, prevChar         rune
 	width, prevWidth       int
 }
 
 func newLexer(s string) *lexer {
 	return &lexer{
-		input: s,
+		input:  s,
+		reader: bufio.NewReader(strings.NewReader(s)),
 	}
 }
 
@@ -242,6 +250,39 @@ func (l *lexer) nextToken() (ntToken, error) {
 	}
 }
 
+func (l *lexer) readRune() (err error) {
+	l.char, l.width, err = l.reader.ReadRune()
+	if l.char == unicode.ReplacementChar {
+		return fmt.Errorf("invalid UTF-8 encoding")
+	}
+	if err == io.EOF {
+		l.char = 0
+		return nil
+	}
+	l.position = l.readPosition
+	l.readPosition += l.width
+	l.buff = append(l.buff, []byte(string(l.char))...)
+	return nil
+}
+
+func (l *lexer) unreadRune() error {
+	if err := l.reader.UnreadRune(); err != nil {
+		return fmt.Errorf("most recent read op needs to be ReadRune: %s", err)
+	}
+	l.readPosition = l.position
+	if l.position >= l.width {
+		l.position = l.position - l.width
+	} else {
+		l.position = 0
+	}
+	l.buff = l.buff[:len(l.buff)-l.width]
+	return nil
+}
+
+func (l *lexer) fromBuff(start, end int) string {
+	return string(l.buff[start:end])
+}
+
 func (l *lexer) readChar() error {
 	l.prevChar = l.char
 	l.prevWidth = l.width
@@ -250,7 +291,8 @@ func (l *lexer) readChar() error {
 	if l.readPosition >= len(l.input) {
 		l.char = 0
 	} else {
-		l.char, l.width, err = decodeRune(l.input[l.readPosition:], l.readPosition)
+		l.char, l.width, err = l.reader.ReadRune()
+		l.buff = append(l.buff, []byte(string(l.char))...)
 		if err != nil {
 			return err
 		}
@@ -268,9 +310,50 @@ func (l *lexer) unreadChar() error {
 	} else {
 		l.position = 0
 	}
+	l.buff = l.buff[:len(l.buff)-l.width]
 	l.char = l.prevChar
 	l.width = l.prevWidth
 	return nil
+}
+
+func (l *lexer) peekNextNonWithespaceRune() (rune, error) {
+	index := 1
+	var last byte
+	for {
+		b, err := l.reader.Peek(index)
+		if err == io.EOF {
+			return 0, nil
+		}
+		if err != nil {
+			return 0, err
+		}
+		if l := len(b); l > 0 {
+			last = b[l-1]
+		} else {
+			last = 0
+		}
+		if last != ' ' {
+			break
+		}
+		index++
+	}
+
+	for {
+		b, err := l.reader.Peek(index)
+		if err == io.EOF {
+			return 0, nil
+		}
+		if err != nil {
+			return 0, err
+		}
+		r, _ := utf8.DecodeLastRune(b)
+		if r == utf8.RuneError {
+			index++
+			continue
+		} else {
+			return r, err
+		}
+	}
 }
 
 func (l *lexer) peekNextNonWithespaceChar() (found rune, count int, err error) {
@@ -297,16 +380,16 @@ func (l *lexer) peekNextNonWithespaceChar() (found rune, count int, err error) {
 func (l *lexer) readIRI() (string, error) {
 	start := l.readPosition
 	for {
-		if err := l.readChar(); err != nil {
+		if err := l.readRune(); err != nil {
 			return "", err
 		}
 		if l.char == '>' {
-			peek, _, err := l.peekNextNonWithespaceChar()
+			peek, err := l.peekNextNonWithespaceRune()
 			if err != nil {
 				return "", err
 			}
 			if peek == 0 || peek == '<' || peek == '"' || peek == '.' || peek == '_' {
-				return l.input[start:l.position], nil
+				return l.fromBuff(start, l.position), nil
 			}
 		}
 		if l.char == 0 {
@@ -355,16 +438,16 @@ func (l *lexer) readBnode() (string, error) {
 func (l *lexer) readStringLiteral() (string, error) {
 	start := l.readPosition
 	for {
-		if err := l.readChar(); err != nil {
+		if err := l.readRune(); err != nil {
 			return "", err
 		}
 		if l.char == '"' {
-			peek, _, err := l.peekNextNonWithespaceChar()
+			peek, err := l.peekNextNonWithespaceRune()
 			if err != nil {
 				return "", err
 			}
 			if peek == 0 || peek == '.' || peek == '^' || peek == '@' {
-				return l.input[start:l.position], nil
+				return l.fromBuff(start, l.position), nil
 			}
 		}
 		if l.char == 0 {
@@ -376,16 +459,16 @@ func (l *lexer) readStringLiteral() (string, error) {
 func (l *lexer) readComment() (string, error) {
 	pos := l.readPosition
 	for {
-		if err := l.readChar(); err != nil {
+		if err := l.readRune(); err != nil {
 			return "", err
 		}
 		if l.char == '\n' {
-			s := l.input[pos:l.position]
-			l.unreadChar()
-			return s, nil
+			l.unreadRune()
+			return l.fromBuff(pos, l.position), nil
 		}
 		if l.char == 0 {
-			return l.input[pos:l.position], nil
+			fmt.Printf("out '%c'\n", l.char)
+			return l.fromBuff(pos, l.position), nil
 		}
 	}
 }
