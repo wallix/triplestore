@@ -5,49 +5,22 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"regexp"
 	"unicode/utf8"
 )
 
 type lenientNTParser struct {
 	lex       *ntLexer
-	scanner   *bufio.Scanner
 	lineCount int
 }
 
 func newLenientNTParser(r io.Reader) *lenientNTParser {
 	return &lenientNTParser{
-		lex:     new(ntLexer),
-		scanner: bufio.NewScanner(r),
+		lex: newNTLexer(r),
 	}
 }
 
-var (
-	commentLine = regexp.MustCompile(`^\s*#.*$`)
-	emptyLine   = regexp.MustCompile(`^\s*$`)
-)
-
-func (p *lenientNTParser) parse() (triples []Triple, err error) {
-	for p.scanner.Scan() {
-		if err = p.scanner.Err(); err != nil {
-			return
-		}
-		p.lineCount++
-		line := p.scanner.Bytes()
-		if emptyLine.Match(line) || commentLine.Match(line) {
-			continue
-		}
-		t, err := p.parseTriple(line)
-		if err != nil {
-			return triples, fmt.Errorf("ntriples parser: %s", err)
-		}
-		triples = append(triples, t)
-	}
-	err = p.scanner.Err()
-	return
-}
-
-func (p *lenientNTParser) parseTriple(line []byte) (Triple, error) {
+func (p *lenientNTParser) parse() ([]Triple, error) {
+	var triples []Triple
 	var tok ntToken
 	var nodeCount int
 	var sub, pred, lit, datatype, langtag string
@@ -60,8 +33,6 @@ func (p *lenientNTParser) parseTriple(line []byte) (Triple, error) {
 		isLit, isResource, isSubBnode, isObjBnode, hasDatatype, hasLangtag, fullStopped = false, false, false, false, false, false, false
 		nodeCount = 0
 	}
-
-	p.lex.reset(line)
 
 	for tok.kind != EOF_TOK {
 		var err error
@@ -90,20 +61,20 @@ func (p *lenientNTParser) parseTriple(line []byte) (Triple, error) {
 				sub = tok.lit
 				isSubBnode = true
 			case 2:
-				return nil, errors.New("blank node can only be subject or object")
+				return triples, errors.New("blank node can only be subject or object")
 			case 3:
 				isObjBnode = true
 				lit = tok.lit
 			}
 		case LANGTAG_TOK:
 			if nodeCount != 3 {
-				return nil, errors.New("langtag misplaced")
+				return triples, errors.New("langtag misplaced")
 			}
 			hasLangtag = true
 			langtag = tok.lit
 		case LIT_TOK:
 			if nodeCount != 2 {
-				return nil, fmt.Errorf("tok '%s':reaching literate but missing element (node count %d)", tok.lit, nodeCount)
+				return triples, fmt.Errorf("tok '%s':reaching literate but missing element (node count %d)", tok.lit, nodeCount)
 			}
 			nodeCount++
 			isLit = true
@@ -113,7 +84,7 @@ func (p *lenientNTParser) parseTriple(line []byte) (Triple, error) {
 			datatype = tok.lit
 		case FULLSTOP_TOK:
 			if nodeCount != 3 {
-				return nil, fmt.Errorf("reaching full stop but missing element (node count %d)", nodeCount)
+				return triples, fmt.Errorf("reaching full stop but missing element (node count %d)", nodeCount)
 			}
 			fullStopped = true
 			var tBuilder *tripleBuilder
@@ -124,9 +95,9 @@ func (p *lenientNTParser) parseTriple(line []byte) (Triple, error) {
 			}
 
 			if isResource {
-				return tBuilder.Resource(lit), nil
+				triples = append(triples, tBuilder.Resource(lit))
 			} else if isObjBnode {
-				return tBuilder.Bnode(lit), nil
+				triples = append(triples, tBuilder.Bnode(lit))
 			} else if isLit {
 				if hasDatatype {
 					obj = object{
@@ -136,12 +107,12 @@ func (p *lenientNTParser) parseTriple(line []byte) (Triple, error) {
 							val: lit,
 						},
 					}
-					return tBuilder.Object(obj), nil
+					triples = append(triples, tBuilder.Object(obj))
+				} else if hasLangtag {
+					triples = append(triples, tBuilder.StringLiteralWithLang(lit, langtag))
+				} else {
+					triples = append(triples, tBuilder.StringLiteral(lit))
 				}
-				if hasLangtag {
-					return tBuilder.StringLiteralWithLang(lit, langtag), nil
-				}
-				return tBuilder.StringLiteral(lit), nil
 			}
 			reset()
 		case UNKNOWN_TOK:
@@ -159,7 +130,7 @@ func (p *lenientNTParser) parseTriple(line []byte) (Triple, error) {
 		return nil, errors.New("wrong number of elements")
 	}
 
-	return nil, fmt.Errorf("line %d: reached end with no triple", p.lineCount)
+	return triples, nil
 }
 
 type ntTokenType int
@@ -199,13 +170,17 @@ var (
 )
 
 type ntLexer struct {
-	input        []byte
+	reader       *bufio.Reader
+	buff         []byte
 	current      rune
 	width, index int
 }
 
+func newNTLexer(r io.Reader) *ntLexer {
+	return &ntLexer{reader: bufio.NewReader(r)}
+}
+
 func (l *ntLexer) reset(input []byte) {
-	l.input = input
 	l.current, l.width, l.index = 0, 0, 0
 }
 
@@ -223,7 +198,7 @@ func (l *ntLexer) nextToken() (ntToken, error) {
 			return ntToken{}, err
 		}
 		if l.current != ':' {
-			return ntToken{}, fmt.Errorf("invalid blank node: expecting ':', got '%c': input [%s]", l.current, l.input)
+			return ntToken{}, fmt.Errorf("invalid blank node: expecting ':', got '%c'", l.current)
 		}
 		n, err := l.readBnode()
 		return bnodeTok(n), err
@@ -247,7 +222,7 @@ func (l *ntLexer) nextToken() (ntToken, error) {
 			return eofTok, nil
 		}
 		if l.current != '^' {
-			return ntToken{}, fmt.Errorf("invalid datatype: expecting '^', got '%c': input [%s]", l.current, l.input)
+			return ntToken{}, fmt.Errorf("invalid datatype: expecting '^', got '%c'", l.current)
 		}
 		if err := l.readRune(); err != nil {
 			return ntToken{}, err
@@ -256,7 +231,7 @@ func (l *ntLexer) nextToken() (ntToken, error) {
 			return eofTok, nil
 		}
 		if l.current != '<' {
-			return ntToken{}, fmt.Errorf("invalid datatype: expecting '<', got '%c'. Input: [%s]", l.current, l.input)
+			return ntToken{}, fmt.Errorf("invalid datatype: expecting '<', got '%c'", l.current)
 		}
 		n, err := l.readNode()
 		return datatypeTok(n), err
@@ -270,80 +245,73 @@ func (l *ntLexer) nextToken() (ntToken, error) {
 	}
 }
 
-func (l *ntLexer) readRune() error {
-	if len(l.input) < 1 {
-		return nil
-	}
-	l.current, l.width = utf8.DecodeRune(l.input[l.index:])
+func (l *ntLexer) readRune() (err error) {
+	l.current, l.width, err = l.reader.ReadRune()
 	if l.current == utf8.RuneError && l.width == 1 {
-		return fmt.Errorf("lexer read: invalid utf8 encoding in '%q'", l.input)
+		return errors.New("lexer read: invalid utf8 encoding")
 	}
-	l.index = l.index + l.width
-	if l.width == 0 {
+	if err == io.EOF || l.width == 0 {
 		l.current = 0
 		return nil
 	}
+	l.index = l.index + l.width
+	l.buff = append(l.buff, []byte(string(l.current))...)
 	return nil
 }
 
-func (l *ntLexer) unreadRune() error {
-	if len(l.input) < 1 {
-		return nil
-	}
-	if l.index < 1 {
-		l.current = 0
-		return nil
-	}
-
-	var last int
-	if len(l.input) == 1 {
-		last = 1
-	} else {
-		last = l.index - 1
-	}
-	if last > len(l.input) {
-		l.current = 0
-		l.width = 0
-		return nil
-	}
-
-	l.current, l.width = utf8.DecodeLastRune(l.input[:last])
-	if l.current == utf8.RuneError && l.width == 1 {
-		return fmt.Errorf("lexer unread: invalid utf8 encoding in '%q'", l.input)
+func (l *ntLexer) unreadRune() {
+	for i := 0; i < l.width; i++ {
+		l.reader.UnreadByte()
 	}
 	l.index = l.index - l.width
-	if l.width == 0 {
-		l.current = 0
-		return nil
+	l.buff = l.buff[:len(l.buff)-l.width]
+	if len(l.buff) > 0 {
+		l.current, _ = utf8.DecodeLastRune(l.buff)
 	}
-	return nil
 }
 
 func (l *ntLexer) peekNextNonWithespaceRune() (found rune, err error) {
-	var count int
+	index := 1
+	var last byte
 	for {
-		index := l.index + count
-		if len(l.input) < index {
+		b, err := l.reader.Peek(index)
+		if err == io.EOF {
 			return 0, nil
 		}
-		r, w := utf8.DecodeRune(l.input[index:])
-		if r == utf8.RuneError && w == 1 {
-			return r, fmt.Errorf("lexer read: invalid utf8 encoding in '%q'", l.input)
+		if err != nil {
+			return 0, err
 		}
-		if w == 0 {
-			return 0, nil
+		if l := len(b); l > 0 {
+			last = b[l-1]
+		} else {
+			last = 0
 		}
-		count++
-		if r != ' ' && r != '\t' {
-			found = r
+		if last != ' ' && last != '\t' {
 			break
 		}
+		index++
 	}
-	return found, nil
+
+	for {
+		b, err := l.reader.Peek(index)
+		if err == io.EOF {
+			return 0, nil
+		}
+		if err != nil {
+			return 0, err
+		}
+		r, _ := utf8.DecodeLastRune(b)
+		if r == utf8.RuneError {
+			index++
+			continue
+		} else {
+			return r, err
+		}
+	}
 }
 
 func (l *ntLexer) readNode() (string, error) {
-	start := l.index
+	l.buff = []byte{}
 	for {
 		if err := l.readRune(); err != nil {
 			return "", err
@@ -354,7 +322,7 @@ func (l *ntLexer) readNode() (string, error) {
 				return "", err
 			}
 			if peek == 0 || peek == '<' || peek == '"' || peek == '.' || peek == '_' {
-				return l.extractFrom(start), nil
+				return l.extractString(), nil
 			}
 		}
 		if l.current == 0 {
@@ -364,7 +332,7 @@ func (l *ntLexer) readNode() (string, error) {
 }
 
 func (l *ntLexer) readStringLiteral() (string, error) {
-	start := l.index
+	l.buff = []byte{}
 	for {
 		if err := l.readRune(); err != nil {
 			return "", err
@@ -375,7 +343,7 @@ func (l *ntLexer) readStringLiteral() (string, error) {
 				return "", err
 			}
 			if peek == 0 || peek == '.' || peek == '^' || peek == '@' {
-				return l.extractFrom(start), nil
+				return l.extractString(), nil
 			}
 		}
 		if l.current == 0 {
@@ -385,7 +353,7 @@ func (l *ntLexer) readStringLiteral() (string, error) {
 }
 
 func (l *ntLexer) readBnode() (string, error) {
-	start := l.index
+	l.buff = []byte{}
 	for {
 		if err := l.readRune(); err != nil {
 			return "", err
@@ -396,7 +364,9 @@ func (l *ntLexer) readBnode() (string, error) {
 				return "", err
 			}
 			if peek == 0 || peek == '<' || peek == '.' {
-				return l.extractFrom(start), nil
+				s := l.extractString()
+				l.unreadRune()
+				return s, nil
 			}
 		}
 		if l.current == '.' {
@@ -405,7 +375,7 @@ func (l *ntLexer) readBnode() (string, error) {
 				return "", err
 			}
 			if peek == 0 || peek == '#' || peek == '\n' { // brittle: but handles <sub> <pred> _:bnode.#commenting
-				s := l.extractFrom(start)
+				s := l.extractString()
 				l.unreadRune()
 				return s, nil
 			}
@@ -414,7 +384,7 @@ func (l *ntLexer) readBnode() (string, error) {
 			return "", nil
 		}
 		if l.current == '<' {
-			s := l.extractFrom(start)
+			s := l.extractString()
 			l.unreadRune()
 			return s, nil
 		}
@@ -422,22 +392,22 @@ func (l *ntLexer) readBnode() (string, error) {
 }
 
 func (l *ntLexer) readComment() (string, error) {
-	start := l.index
+	l.buff = []byte{}
 	for {
 		if err := l.readRune(); err != nil {
 			return "", err
 		}
 		if l.current == '\n' {
-			s := l.extractFrom(start)
+			s := l.extractString()
 			l.unreadRune()
 			return s, nil
 		}
 		if l.current == 0 {
-			return l.extractFrom(start), nil
+			return l.extractString(), nil
 		}
 	}
 }
 
-func (l *ntLexer) extractFrom(start int) string {
-	return string(l.input[start : l.index-l.width])
+func (l *ntLexer) extractString() string {
+	return string(l.buff[:len(l.buff)-l.width])
 }

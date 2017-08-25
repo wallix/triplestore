@@ -102,8 +102,8 @@ func TestLexer(t *testing.T) {
 	}{
 		// simple
 		{"<node>", []ntToken{nodeTok("node")}},
-		{"_:bnode .", []ntToken{bnodeTok("bnode"), fullstopTok}},
-		{"_:bnode <pred>", []ntToken{bnodeTok("bnode"), nodeTok("pred")}},
+		{"_:bnode .", []ntToken{bnodeTok("bnode"), wspaceTok, fullstopTok}},
+		{"_:bnode <pred>", []ntToken{bnodeTok("bnode"), wspaceTok, nodeTok("pred")}},
 		{"#comment", []ntToken{commentTok("comment")}},
 		{"# comment", []ntToken{commentTok(" comment")}},
 		{"\"lit\"", []ntToken{litTok("lit")}},
@@ -112,9 +112,9 @@ func TestLexer(t *testing.T) {
 		{".", []ntToken{fullstopTok}},
 		{"\n", []ntToken{lineFeedTok}},
 		{"# comment\n", []ntToken{commentTok(" comment"), lineFeedTok}},
-		{"@en .", []ntToken{langtagTok("en"), fullstopTok}},
+		{"@en .", []ntToken{langtagTok("en"), wspaceTok, fullstopTok}},
 		{"@en.", []ntToken{langtagTok("en"), fullstopTok}},
-		{"@en .\n", []ntToken{langtagTok("en"), fullstopTok, lineFeedTok}},
+		{"@en .\n", []ntToken{langtagTok("en"), wspaceTok, fullstopTok, lineFeedTok}},
 
 		{"#", []ntToken{commentTok("")}}, // fixed with go-fuzz
 
@@ -144,10 +144,10 @@ func TestLexer(t *testing.T) {
 
 		// triple with bnodes
 		{"_:sub <pred>\"lit\".#commenting", []ntToken{
-			bnodeTok("sub"), nodeTok("pred"), litTok("lit"), fullstopTok, commentTok("commenting"),
+			bnodeTok("sub"), wspaceTok, nodeTok("pred"), litTok("lit"), fullstopTok, commentTok("commenting"),
 		}},
 		{"<sub> <pred> _:lit . #commenting", []ntToken{
-			nodeTok("sub"), wspaceTok, nodeTok("pred"), wspaceTok, bnodeTok("lit"), fullstopTok, wspaceTok, commentTok("commenting"),
+			nodeTok("sub"), wspaceTok, nodeTok("pred"), wspaceTok, bnodeTok("lit"), wspaceTok, fullstopTok, wspaceTok, commentTok("commenting"),
 		}},
 		{"_:sub<pred>_:lit.#commenting", []ntToken{
 			bnodeTok("sub"), nodeTok("pred"), bnodeTok("lit"), fullstopTok, commentTok("commenting"),
@@ -156,12 +156,12 @@ func TestLexer(t *testing.T) {
 		// triples with langtag
 		{`<sub> <pred> "lit"@russ . # commenting`, []ntToken{
 			nodeTok("sub"), wspaceTok, nodeTok("pred"), wspaceTok, litTok("lit"),
-			langtagTok("russ"), fullstopTok, wspaceTok, commentTok(" commenting"),
+			langtagTok("russ"), wspaceTok, fullstopTok, wspaceTok, commentTok(" commenting"),
 		}},
 	}
 
 	for i, tcase := range tcases {
-		l := ntLexer{input: []byte(tcase.input)}
+		l := newNTLexer(strings.NewReader(tcase.input))
 		var toks []ntToken
 		for tok, _ := l.nextToken(); tok.kind != EOF_TOK; tok, _ = l.nextToken() {
 			toks = append(toks, tok)
@@ -209,7 +209,7 @@ func TestLexerReadNode(t *testing.T) {
 	}
 
 	for i, tcase := range tcases {
-		l := ntLexer{input: []byte(tcase.input)}
+		l := newNTLexer(strings.NewReader(tcase.input))
 		n, err := l.readNode()
 		if err != nil {
 			t.Fatalf("case %d: '%s': %s", i+1, tcase.input, err)
@@ -236,7 +236,7 @@ func TestLexerReadBnode(t *testing.T) {
 	}
 
 	for i, tcase := range tcases {
-		l := ntLexer{input: []byte(tcase.input)}
+		l := newNTLexer(strings.NewReader(tcase.input))
 		n, err := l.readBnode()
 		if err != nil {
 			t.Fatalf("case %d: '%s': %s", i+1, tcase.input, err)
@@ -274,7 +274,7 @@ func TestLexerReadStringLiteral(t *testing.T) {
 	}
 
 	for i, tcase := range tcases {
-		l := ntLexer{input: []byte(tcase.input)}
+		l := newNTLexer(strings.NewReader(tcase.input))
 		n, err := l.readStringLiteral()
 		if err != nil {
 			t.Fatal(err)
@@ -292,11 +292,12 @@ func TestLexerReadComment(t *testing.T) {
 	}{
 		{"", ""},
 		{"#", "#"},
+		{" comment \n", " comment "},
 		{"\n", ""},
 	}
 
 	for i, tcase := range tcases {
-		l := ntLexer{input: []byte(tcase.input)}
+		l := newNTLexer(strings.NewReader(tcase.input))
 		n, err := l.readComment()
 		if err != nil {
 			t.Fatal(err)
@@ -319,7 +320,7 @@ func TestLexerPeekRunes(t *testing.T) {
 	}
 
 	for _, tcase := range tcases {
-		l := ntLexer{input: []byte(tcase.input)}
+		l := newNTLexer(strings.NewReader(tcase.input))
 		found, _ := l.peekNextNonWithespaceRune()
 		if got, want := found, tcase.found; got != want {
 			t.Fatalf("input [%s]: got %q, want %q", tcase.input, got, want)
@@ -329,7 +330,7 @@ func TestLexerPeekRunes(t *testing.T) {
 
 func TestLexerReadUnreadRunes(t *testing.T) {
 	t.Run("sentence", func(t *testing.T) {
-		l := ntLexer{input: []byte("tron")}
+		l := newNTLexer(strings.NewReader("tron"))
 		l.readRune()
 		if got, want := l.current, 't'; got != want {
 			t.Fatalf("got %q, want %q", got, want)
@@ -342,17 +343,13 @@ func TestLexerReadUnreadRunes(t *testing.T) {
 		if got, want := l.current, 't'; got != want {
 			t.Fatalf("got %q, want %q", got, want)
 		}
-		l.unreadRune()
-		if got, want := l.current, rune(0); got != want {
-			t.Fatalf("got %q, want %q", got, want)
-		}
-		if got, want := l.width, 0; got != want {
+		if got, want := l.width, 1; got != want {
 			t.Fatalf("got %d, want %d", got, want)
 		}
 	})
 
 	t.Run("read empty", func(t *testing.T) {
-		l := ntLexer{input: []byte("")}
+		l := newNTLexer(strings.NewReader(""))
 		l.readRune()
 		if got, want := l.current, rune(0); got != want {
 			t.Fatalf("got %q, want %q", got, want)
@@ -370,7 +367,7 @@ func TestLexerReadUnreadRunes(t *testing.T) {
 	})
 
 	t.Run("unread empty", func(t *testing.T) {
-		l := ntLexer{input: []byte("")}
+		l := newNTLexer(strings.NewReader(""))
 		l.unreadRune()
 		if got, want := l.current, rune(0); got != want {
 			t.Fatalf("got %q, want %q", got, want)
@@ -388,7 +385,7 @@ func TestLexerReadUnreadRunes(t *testing.T) {
 	})
 
 	t.Run("read length one", func(t *testing.T) {
-		l := ntLexer{input: []byte("s")}
+		l := newNTLexer(strings.NewReader("s"))
 		l.readRune()
 		if got, want := l.current, 's'; got != want {
 			t.Fatalf("got %q, want %q", got, want)
@@ -411,7 +408,7 @@ func TestLexerReadUnreadRunes(t *testing.T) {
 	})
 
 	t.Run("unread length one", func(t *testing.T) {
-		l := ntLexer{input: []byte("s")}
+		l := newNTLexer(strings.NewReader("s"))
 		l.unreadRune()
 		if got, want := l.current, rune(0); got != want {
 			t.Fatalf("got %q, want %q", got, want)
