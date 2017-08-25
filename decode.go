@@ -7,8 +7,8 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
+	"strings"
 	"sync"
 )
 
@@ -55,11 +55,7 @@ type ntDecoder struct {
 }
 
 func (d *ntDecoder) Decode() ([]Triple, error) {
-	b, err := ioutil.ReadAll(d.r)
-	if err != nil {
-		return nil, err
-	}
-	return newLenientNTParser(string(b)).parse()
+	return newLenientNTParser(d.r).parse()
 }
 
 func (d *ntDecoder) StreamDecode(ctx context.Context) <-chan DecodeResult {
@@ -75,7 +71,7 @@ func (d *ntDecoder) StreamDecode(ctx context.Context) <-chan DecodeResult {
 				return
 			default:
 				if scanner.Scan() {
-					tris, err := newLenientNTParser(scanner.Text()).parse()
+					tris, err := newLenientNTParser(strings.NewReader(scanner.Text())).parse()
 					if err != nil {
 						decC <- DecodeResult{Err: err}
 					} else if len(tris) == 1 {
