@@ -27,19 +27,22 @@ type StreamDecoder interface {
 
 // Use for retro compatibilty when changing file format on existing stores
 func NewAutoDecoder(r io.Reader) Decoder {
-	if IsBinaryFormat(r) {
-		return NewBinaryDecoder(r)
+	ok, newR := IsBinaryFormat(r)
+	if ok {
+		return NewBinaryDecoder(newR)
 	}
-	return NewLenientNTDecoder(r)
+	return NewLenientNTDecoder(newR)
 }
 
-func IsBinaryFormat(r io.Reader) bool {
-	begin, err := bufio.NewReader(r).Peek(binary.Size(wordLength(0)) + 1)
+func IsBinaryFormat(r io.Reader) (bool, io.Reader) {
+	begin := make([]byte, binary.Size(wordLength(0))+1)
+	_, err := r.Read(begin)
+	multi := io.MultiReader(bytes.NewReader(begin), r)
 	if err != nil {
-		return false
+		return false, multi
 	}
 	_, err = readWord(bytes.NewReader(begin))
-	return err == nil
+	return err == nil, multi
 }
 
 func NewLenientNTDecoder(r io.Reader) Decoder {
