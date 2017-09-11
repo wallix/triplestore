@@ -12,22 +12,22 @@ import (
 	"time"
 )
 
-func TestDetectBinaryFormatReturningFullReader(t *testing.T) {
+func TestLooselyDetectNTFormatReturningFullReader(t *testing.T) {
 	var buff bytes.Buffer
 
-	ok, _ := IsBinaryFormat(&buff)
+	ok, _ := IsNTFormat(&buff)
 	if got, want := ok, false; got != want {
 		t.Fatalf("got %t, want %t", got, want)
 	}
+
 	triples := []Triple{
-		SubjPred("1", "2").Resource("3"),
+		SubjPred("bingo", "2").Resource("3"),
 		SubjPred("one", "two").Resource("three"),
 	}
-
 	NewBinaryEncoder(&buff).Encode(triples...)
 	orig := buff.String()
-	ok, r := IsBinaryFormat(&buff)
-	if got, want := ok, true; got != want {
+	ok, r := IsNTFormat(&buff)
+	if got, want := ok, false; got != want {
 		t.Fatalf("got %t, want %t", got, want)
 	}
 	b, _ := ioutil.ReadAll(r)
@@ -38,8 +38,8 @@ func TestDetectBinaryFormatReturningFullReader(t *testing.T) {
 	buff.Reset()
 	NewLenientNTEncoder(&buff).Encode(triples...)
 	orig = buff.String()
-	ok, r = IsBinaryFormat(&buff)
-	if got, want := ok, false; got != want {
+	ok, r = IsNTFormat(&buff)
+	if got, want := ok, true; got != want {
 		t.Fatalf("got %t, want %t", got, want)
 	}
 	b, _ = ioutil.ReadAll(r)
@@ -47,6 +47,7 @@ func TestDetectBinaryFormatReturningFullReader(t *testing.T) {
 		t.Fatalf("reader changed: got %s, want %s", got, want)
 	}
 }
+
 func TestEncodeAndDecodeAllTripleTypes(t *testing.T) {
 	tcases := []struct {
 		in Triple

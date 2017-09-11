@@ -27,22 +27,23 @@ type StreamDecoder interface {
 
 // Use for retro compatibilty when changing file format on existing stores
 func NewAutoDecoder(r io.Reader) Decoder {
-	ok, newR := IsBinaryFormat(r)
+	ok, newR := IsNTFormat(r)
 	if ok {
-		return NewBinaryDecoder(newR)
+		return NewLenientNTDecoder(newR)
 	}
-	return NewLenientNTDecoder(newR)
+	return NewBinaryDecoder(newR)
 }
 
-func IsBinaryFormat(r io.Reader) (bool, io.Reader) {
-	begin := make([]byte, binary.Size(wordLength(0))+1)
-	_, err := r.Read(begin)
-	multi := io.MultiReader(bytes.NewReader(begin), r)
-	if err != nil {
+// Loosely detect if a ntriples format contrary to a binary format
+// Used for retro compatibilty when changing file format on existing stores
+// Detecttion work with ntriples format flushed by this library (i.e. no comment, no spaces, ...)
+func IsNTFormat(r io.Reader) (bool, io.Reader) {
+	firstChar := make([]byte, 1)
+	multi := io.MultiReader(bytes.NewReader(firstChar), r)
+	if _, err := r.Read(firstChar); err != nil {
 		return false, multi
 	}
-	_, err = readWord(bytes.NewReader(begin))
-	return err == nil, multi
+	return bytes.Equal(firstChar, []byte{'<'}), multi
 }
 
 func NewLenientNTDecoder(r io.Reader) Decoder {
