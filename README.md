@@ -14,7 +14,7 @@ Here the RDF triples implementation follows along the [W3C RDF concepts](https:/
 
 - Create and manage triples through a convenient DSL
 - Snapshot and query RDFGraphs
-- **Binary** encoding/decoding (**blank nodes and lang tag not supported yet**)
+- **Binary** encoding/decoding
 - **Lenient NTriples** encoding/decoding (see W3C Test suite in _testdata/ntriples/w3c_suite/_)
 - [DOT](https://en.wikipedia.org/wiki/DOT_(graph_description_language)) encoding
 - Stream encoding/decoding (for binary & NTriples format) for memory conscious program 
