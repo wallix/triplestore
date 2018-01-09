@@ -123,9 +123,8 @@ func encodeBinTriple(t Triple, buff *bytes.Buffer) error {
 		litVal := lit.Value()
 		binary.Write(buff, binary.BigEndian, wordLength(len(litVal)))
 		buff.WriteString(litVal)
-	} else if o := obj.(object); o.isBnode {
+	} else if bnode, isBnode := obj.Bnode(); isBnode {
 		binary.Write(buff, binary.BigEndian, bnodeTypeEncoding)
-		bnode := o.bnode
 		binary.Write(buff, binary.BigEndian, wordLength(len(bnode)))
 		buff.WriteString(bnode)
 	} else {
@@ -196,8 +195,8 @@ func encodeNTriple(t Triple, ctx *Context, buff *bytes.Buffer) {
 	}
 	buff.WriteString(sub + " <" + buildIRI(ctx, t.Predicate()) + "> ")
 
-	if obj := t.Object().(object); obj.isBnode {
-		buff.WriteString("_:" + obj.bnode)
+	if bnode, isBnode := t.Object().Bnode(); isBnode {
+		buff.WriteString("_:" + bnode)
 	} else {
 		if rid, ok := t.Object().Resource(); ok {
 			buff.WriteString("<" + buildIRI(ctx, rid) + ">")
