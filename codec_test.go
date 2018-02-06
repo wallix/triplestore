@@ -3,6 +3,7 @@ package triplestore
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"math"
 	"os"
@@ -75,34 +76,44 @@ func TestEncodeAndDecodeAllTripleTypes(t *testing.T) {
 		{BnodePred("one", "two").StringLiteralWithLang("three", "de")},
 
 		// Large data
-		{SubjPred(strings.Repeat("s", 65100), "two").Resource("three")},
-		{SubjPred(strings.Repeat("s", 65540), "two").Resource("three")},
-		{SubjPred("one", strings.Repeat("t", 65100)).Resource("three")},
-		{SubjPred("one", strings.Repeat("t", 65540)).Resource("three")},
-		{SubjPred("one", "two").Resource(strings.Repeat("t", 66000))},
-		{SubjPred("one", "two").StringLiteral(strings.Repeat("t", 66000))},
+		{SubjPred(strings.Repeat("s", 65000), "two").Resource("three")},
+		{SubjPred("one", strings.Repeat("t", 65000)).Resource("three")},
+		{SubjPred("one", "two").Resource(strings.Repeat("t", 65000))},
+		{SubjPred("one", "two").StringLiteral(strings.Repeat("t", 65000))},
 	}
 
-	for _, tcase := range tcases {
-		var buff bytes.Buffer
-		enc := NewBinaryEncoder(&buff)
+	type codec struct {
+		newEnc func(io.Writer) Encoder
+		newDec func(io.Reader) Decoder
+	}
 
-		if err := enc.Encode(tcase.in); err != nil {
-			t.Fatal(err)
-		}
+	codecs := []codec{
+		{newEnc: NewBinaryEncoder, newDec: NewBinaryDecoder},
+		{newEnc: NewLenientNTEncoder, newDec: NewLenientNTDecoder},
+	}
 
-		dec := NewBinaryDecoder(&buff)
-		all, err := dec.Decode()
-		if err != nil {
-			t.Fatal(err)
-		}
+	for _, codec := range codecs {
+		for _, tcase := range tcases {
+			var buff bytes.Buffer
+			enc := codec.newEnc(&buff)
 
-		if got, want := len(all), 1; got != want {
-			t.Fatalf("got %d, want %d", got, want)
-		}
+			if err := enc.Encode(tcase.in); err != nil {
+				t.Fatal(err)
+			}
 
-		if got, want := tcase.in, all[0]; !got.Equal(want) {
-			t.Fatalf("case %v: \ngot\n%v\nwant\n%v\n", tcase.in, got, want)
+			dec := codec.newDec(&buff)
+			all, err := dec.Decode()
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if got, want := len(all), 1; got != want {
+				t.Fatalf("got %d, want %d", got, want)
+			}
+
+			if got, want := tcase.in, all[0]; !got.Equal(want) {
+				t.Fatalf("case %v: \ngot\n%v\nwant\n%v\n", tcase.in, got, want)
+			}
 		}
 	}
 }
@@ -191,7 +202,7 @@ func TestDecodeDataset(t *testing.T) {
 	}
 }
 func TestEncodeDecodeNTriples(t *testing.T) {
-	path := filepath.Join("testdata", "ntriples", "*.nt")
+	path := filepath.Join("testdata", "*.nt")
 	filenames, _ := filepath.Glob(path)
 
 	for _, f := range filenames {
@@ -209,27 +220,6 @@ func TestEncodeDecodeNTriples(t *testing.T) {
 		}
 
 		compareMultiline(t, buff.Bytes(), b)
-	}
-}
-
-func compareMultiline(t *testing.T, actual, expected []byte) {
-	expected = cleanupNTriplesForComparison(expected)
-	actual = cleanupNTriplesForComparison(actual)
-	actuals := bytes.Split(actual, []byte("\n"))
-	expecteds := bytes.Split(expected, []byte("\n"))
-
-	for _, a := range actuals {
-		if !contains(expecteds, a) {
-			fmt.Printf("\texpected content\n%q\n", expected)
-			fmt.Printf("\tactual content\n%q\n", actual)
-			t.Fatalf("extra line not in expected content\n%s\n", a)
-		}
-	}
-
-	for _, e := range expecteds {
-		if !contains(actuals, e) {
-			t.Fatalf("expected line is missing from actual content\n'%s'\n", e)
-		}
 	}
 }
 func TestEncodeNTriples(t *testing.T) {
@@ -296,6 +286,27 @@ func TestEncodeDotGraph(t *testing.T) {
 	for _, line := range exp {
 		if got, want := buff.String(), line; !strings.Contains(got, want) {
 			t.Fatalf("\n%q\n should contain \n%q\n", got, want)
+		}
+	}
+}
+
+func compareMultiline(t *testing.T, actual, expected []byte) {
+	expected = cleanupNTriplesForComparison(expected)
+	actual = cleanupNTriplesForComparison(actual)
+	actuals := bytes.Split(actual, []byte("\n"))
+	expecteds := bytes.Split(expected, []byte("\n"))
+
+	for _, a := range actuals {
+		if !contains(expecteds, a) {
+			fmt.Printf("\texpected content\n%q\n", expected)
+			fmt.Printf("\tactual content\n%q\n", actual)
+			t.Fatalf("extra line not in expected content\n%s\n", a)
+		}
+	}
+
+	for _, e := range expecteds {
+		if !contains(actuals, e) {
+			t.Fatalf("expected line is missing from actual content\n'%s'\n", e)
 		}
 	}
 }
