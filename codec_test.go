@@ -8,6 +8,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -58,6 +59,13 @@ func TestEncodeAndDecodeAllTripleTypes(t *testing.T) {
 
 		{SubjPred("", "").StringLiteral("")},
 		{SubjPred("one", "two").StringLiteral("three")},
+		// String literal object with new lines
+		{SubjPred("one", "two").StringLiteral(`three
+four
+five`)},
+		{SubjPred("one", "two").StringLiteralWithLang(`three
+four
+five`, "en")},
 
 		{SubjPred("one", "two").IntegerLiteral(math.MaxInt64)},
 		{SubjPred("one", "two").IntegerLiteral(284765293570)},
@@ -92,7 +100,7 @@ func TestEncodeAndDecodeAllTripleTypes(t *testing.T) {
 		{newEnc: NewLenientNTEncoder, newDec: NewLenientNTDecoder},
 	}
 
-	for _, codec := range codecs {
+	for i, codec := range codecs {
 		for _, tcase := range tcases {
 			var buff bytes.Buffer
 			enc := codec.newEnc(&buff)
@@ -112,15 +120,19 @@ func TestEncodeAndDecodeAllTripleTypes(t *testing.T) {
 			}
 
 			if got, want := tcase.in, all[0]; !got.Equal(want) {
-				t.Fatalf("case %v: \ngot\n%v\nwant\n%v\n", tcase.in, got, want)
+				t.Fatalf("codec %d: case %v: \n\ngot\n%v\n\nwant\n%v\n", i+1, tcase.in, got, want)
 			}
 		}
 	}
 }
 
 func TestEncodeDecodeOnFile(t *testing.T) {
-	one := SubjPred("one", "pred1").StringLiteral("lit1")
-	two := SubjPred("two", "pred2").StringLiteral("lit2")
+	one := SubjPred("one", "pred1").StringLiteral(`a new 
+line
+`)
+	two := SubjPred("two", "pred2").StringLiteral(`another
+new 
+line`)
 
 	file, err := ioutil.TempFile("", "")
 	if err != nil {
@@ -201,7 +213,7 @@ func TestDecodeDataset(t *testing.T) {
 		t.Fatalf("decoded dataset should contains %v", two)
 	}
 }
-func TestEncodeDecodeNTriples(t *testing.T) {
+func TestEncodeDecodeSomeNTriplesSampleFiles(t *testing.T) {
 	path := filepath.Join("testdata", "*.nt")
 	filenames, _ := filepath.Glob(path)
 
@@ -222,29 +234,74 @@ func TestEncodeDecodeNTriples(t *testing.T) {
 		compareMultiline(t, buff.Bytes(), b)
 	}
 }
+
+func TestDecodeNTriples(t *testing.T) {
+	t.Run("with new lines in literal string object", func(t *testing.T) {
+		s := `<one><two>"three\nfour\n" .`
+		tris, err := NewLenientNTDecoder(strings.NewReader(s)).Decode()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		got := tris[0]
+		want := SubjPred("one", "two").StringLiteral(`three
+four
+`)
+		if !got.Equal(want) {
+			t.Fatalf("got \n%#v\nwant \n%#v\n", got, want)
+		}
+
+		gotLit, _ := got.Object().Literal()
+		wantLit, _ := want.Object().Literal()
+		if !reflect.DeepEqual(gotLit, wantLit) {
+			t.Fatalf("got \n%#v\nwant \n%#v\n", gotLit, wantLit)
+		}
+	})
+}
+
 func TestEncodeNTriples(t *testing.T) {
-	triples := []Triple{
-		SubjPred("one", "rdf:type").Resource("onetype"),
-		SubjPred("one", "prop1").StringLiteral("two"),
-		SubjPred("http://my-url-to.test/#one", "prop2").IntegerLiteral(284765293570),
-		SubjPred("one", "prop3").BooleanLiteral(true),
-		SubjPred("one", "cloud:launched").DateTimeLiteral(time.Unix(1233456789, 0).UTC()),
-		SubjPred("co<mplex", "\"with>").StringLiteral("with\"special<chars."),
-		SubjPred("one", "with spaces").Resource("10 inbound-smtp.eu-west-1.amazonaws.com."),
-	}
+	t.Run("with new lines in literal string object", func(t *testing.T) {
+		triples := []Triple{
+			SubjPred("one", "two").StringLiteral(`first line
+second line
 
-	var buff bytes.Buffer
-	enc := NewLenientNTEncoderWithContext(&buff, &Context{Base: "http://test.url#",
-		Prefixes: map[string]string{
-			"xsd":   "<http://www.w3.org/2001/XMLSchema#",
-			"rdf":   "http://www.w3.org/1999/02/22-rdf-syntax-ns#",
-			"cloud": "http://awless.io/rdf/cloud#",
-		}})
-	if err := enc.Encode(triples...); err != nil {
-		t.Fatal(err)
-	}
+third line`),
+		}
 
-	expect := `<http://test.url#one> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://test.url#onetype> .
+		var result bytes.Buffer
+		if err := NewLenientNTEncoder(&result).Encode(triples...); err != nil {
+			t.Fatal(err)
+		}
+
+		expect := "<one> <two> \"first line\\nsecond line\\n\\nthird line\" .\n"
+		if got, want := result.String(), expect; got != want {
+			t.Fatalf("got \n%q\nwant \n%q\n", got, want)
+		}
+	})
+
+	t.Run("with namespaces", func(t *testing.T) {
+		triples := []Triple{
+			SubjPred("one", "rdf:type").Resource("onetype"),
+			SubjPred("one", "prop1").StringLiteral("two"),
+			SubjPred("http://my-url-to.test/#one", "prop2").IntegerLiteral(284765293570),
+			SubjPred("one", "prop3").BooleanLiteral(true),
+			SubjPred("one", "cloud:launched").DateTimeLiteral(time.Unix(1233456789, 0).UTC()),
+			SubjPred("co<mplex", "\"with>").StringLiteral("with\"special<chars."),
+			SubjPred("one", "with spaces").Resource("10 inbound-smtp.eu-west-1.amazonaws.com."),
+		}
+
+		var buff bytes.Buffer
+		enc := NewLenientNTEncoderWithContext(&buff, &Context{Base: "http://test.url#",
+			Prefixes: map[string]string{
+				"xsd":   "<http://www.w3.org/2001/XMLSchema#",
+				"rdf":   "http://www.w3.org/1999/02/22-rdf-syntax-ns#",
+				"cloud": "http://awless.io/rdf/cloud#",
+			}})
+		if err := enc.Encode(triples...); err != nil {
+			t.Fatal(err)
+		}
+
+		expect := `<http://test.url#one> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <http://test.url#onetype> .
 <http://test.url#one> <http://test.url#prop1> "two" .
 <http://my-url-to.test/#one> <http://test.url#prop2> "284765293570"^^<http://www.w3.org/2001/XMLSchema#integer> .
 <http://test.url#one> <http://test.url#prop3> "true"^^<http://www.w3.org/2001/XMLSchema#boolean> .
@@ -252,9 +309,10 @@ func TestEncodeNTriples(t *testing.T) {
 <http://test.url#co%3Cmplex> <http://test.url#%22with%3E> "with"special<chars." .
 <http://test.url#one> <http://test.url#with+spaces> <http://test.url#10+inbound-smtp.eu-west-1.amazonaws.com.> .
 `
-	if got, want := buff.String(), expect; got != want {
-		t.Fatalf("got \n%s\nwant \n%s\n", got, want)
-	}
+		if got, want := buff.String(), expect; got != want {
+			t.Fatalf("got \n%s\nwant \n%s\n", got, want)
+		}
+	})
 }
 
 func TestEncodeDotGraph(t *testing.T) {
