@@ -62,6 +62,7 @@ func (t *triple) clone() *triple {
 		sub:    t.sub,
 		pred:   t.pred,
 		obj:    t.obj,
+		isSubBnode: t.isSubBnode,
 		triKey: t.triKey,
 	}
 }
