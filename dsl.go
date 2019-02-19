@@ -5,13 +5,16 @@ import (
 	"fmt"
 	"reflect"
 	"strconv"
+	"strings"
 	"time"
 )
 
 func SubjPredRes(s, p, r string) *triple {
 	return &triple{
-		sub: s, pred: p,
-		obj: Resource(r).(object),
+		sub:        s,
+		isSubBnode: strings.HasPrefix(s, "_:"),
+		pred:       p,
+		obj:        Resource(r).(object),
 	}
 }
 
@@ -26,9 +29,10 @@ func BnodePredRes(s, p, r string) *triple {
 
 func SubjPredBnode(s, p, r string) *triple {
 	return &triple{
-		sub:  s,
-		pred: p,
-		obj:  object{bnode: r, isBnode: true},
+		sub:        s,
+		isSubBnode: strings.HasPrefix(s, "_:"),
+		pred:       p,
+		obj:        object{bnode: r, isBnode: true},
 	}
 }
 
@@ -38,9 +42,10 @@ func SubjPredLit(s, p string, l interface{}) (*triple, error) {
 		return nil, err
 	}
 	return &triple{
-		sub:  s,
-		pred: p,
-		obj:  o.(object),
+		sub:        s,
+		isSubBnode: strings.HasPrefix(s, "_:"),
+		pred:       p,
+		obj:        o.(object),
 	}, nil
 }
 
@@ -51,7 +56,10 @@ type tripleBuilder struct {
 }
 
 func SubjPred(s, p string) *tripleBuilder {
-	return &tripleBuilder{sub: s, pred: p}
+	return &tripleBuilder{
+		sub:        s,
+		isSubBnode: strings.HasPrefix(s, "_:"),
+		pred:       p}
 }
 
 func BnodePred(s, p string) *tripleBuilder {
@@ -68,11 +76,20 @@ func (b *tripleBuilder) Lang(l string) *tripleBuilder {
 }
 
 func (b *tripleBuilder) Resource(s string) *triple {
-	return &triple{
-		isSubBnode: b.isSubBnode,
-		sub:        b.sub,
-		pred:       b.pred,
-		obj:        Resource(s).(object),
+	if strings.HasPrefix(s, "_:") {
+		return &triple{
+			isSubBnode: b.isSubBnode,
+			sub:        b.sub,
+			pred:       b.pred,
+			obj:        object{bnode: s, isBnode: true},
+		}
+	} else {
+		return &triple{
+			isSubBnode: b.isSubBnode,
+			sub:        b.sub,
+			pred:       b.pred,
+			obj:        Resource(s).(object),
+		}
 	}
 }
 
